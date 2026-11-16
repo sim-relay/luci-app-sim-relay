@@ -1,0 +1,53 @@
+{
+  "admin/services/sim-relay": {
+    "title": "SIM Relay",
+    "order": 60,
+    "action": {
+      "type": "firstchild"
+    },
+    "depends": {
+      "acl": [
+        "luci-app-sim-relay"
+      ]
+    }
+  },
+  "admin/services/sim-relay/overview": {
+    "title": "Messages",
+    "order": 10,
+    "action": {
+      "type": "view",
+      "path": "sim-relay/overview"
+    },
+    "depends": {
+      "acl": [
+        "luci-app-sim-relay"
+      ]
+    }
+  },
+  "admin/services/sim-relay/manage": {
+    "title": "SIM and cleanup",
+    "order": 20,
+    "action": {
+      "type": "view",
+      "path": "sim-relay/manage-pin"
+    },
+    "depends": {
+      "acl": [
+        "luci-app-sim-relay"
+      ]
+    }
+  },
+  "admin/services/sim-relay/channels": {
+    "title": "Push channels",
+    "order": 30,
+    "action": {
+      "type": "view",
+      "path": "sim-relay/push-channels"
+    },
+    "depends": {
+      "acl": [
+        "luci-app-sim-relay"
+      ]
+    }
+  }
+}

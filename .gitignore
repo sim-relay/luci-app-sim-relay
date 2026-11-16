@@ -1,0 +1,8 @@
+/build*/
+/cmake-build-*/
+/.sdk-artifacts/
+/.sdk-artifacts-run.*/
+/.idea/
+*.db
+*.db-*
+__pycache__/

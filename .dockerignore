@@ -1,0 +1,7 @@
+*
+!docker/
+!docker/sdk/
+!docker/sdk/Dockerfile
+!docker/sdk/build.sh
+!scripts/
+!scripts/inspect-ipk.py

@@ -1,0 +1,39 @@
+{
+  "luci-app-sim-relay": {
+    "description": "Manage SIM Relay devices and messages",
+    "read": {
+      "ubus": {
+        "sim-relay": [
+          "status",
+          "devices",
+          "messages",
+          "send_history",
+          "sim_info",
+          "operation_history",
+          "channels",
+          "device_channels",
+          "push_history"
+        ]
+      }
+    },
+    "write": {
+      "ubus": {
+        "sim-relay": [
+          "save_device",
+          "sync",
+          "send",
+          "save_pin",
+          "unlock_pin",
+          "delete_messages",
+          "remove_device",
+          "save_channel",
+          "clear_channel_credentials",
+          "bind_channels",
+          "test_channel",
+          "remove_channel",
+          "discover"
+        ]
+      }
+    }
+  }
+}

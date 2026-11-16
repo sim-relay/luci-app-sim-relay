@@ -1,0 +1,952 @@
+# SIM Relay LuCI translation catalog.
+# SPDX-License-Identifier: MIT
+msgid ""
+msgstr "Project-Id-Version: luci-app-sim-relay\nMIME-Version: 1.0\nContent-Type: text/plain; charset=UTF-8\nContent-Transfer-Encoding: 8bit\nLanguage: zh_Hans\nPlural-Forms: nplurals=1; plural=0;\n"
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "Actions"
+msgstr "操作"
+
+#: htdocs/luci-static/resources/view/sim-relay/overview.js
+msgid "Adapter"
+msgstr "适配器"
+
+#: htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "Add a device first."
+msgstr "请先添加设备"
+
+#: htdocs/luci-static/resources/view/sim-relay/overview.js
+msgid "Add a device to get started"
+msgstr "请先添加设备"
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js
+msgid "Add channel"
+msgstr "添加通道"
+
+#: htdocs/luci-static/resources/view/sim-relay/overview.js
+msgid "Add device"
+msgstr "添加设备"
+
+#: htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "Allow one attempt when fewer than 3 PIN attempts remain"
+msgstr "剩余次数不足 3 次时，仍确认提交一次"
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js
+msgid "Apply to selected device"
+msgstr "应用到所选设备"
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js
+msgid "Attempts"
+msgstr "尝试次数"
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js
+msgid "Bot Token"
+msgstr "机器人令牌"
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js htdocs/luci-static/resources/view/sim-relay/manage-pin.js htdocs/luci-static/resources/view/sim-relay/overview.js
+msgid "Cancel"
+msgstr "取消"
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js htdocs/luci-static/resources/view/sim-relay/manage-pin.js htdocs/luci-static/resources/view/sim-relay/overview.js
+msgid "Cancelled"
+msgstr "已取消"
+
+#: ../src
+msgid "Cannot access ModemManager. Make sure the modemmanager package is installed and running."
+msgstr "无法访问 ModemManager，请确认 modemmanager 已安装并启动"
+
+#: ../src htdocs/luci-static/resources/view/sim-relay/push-channels.js
+msgid "Channel"
+msgstr "通道"
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js
+msgid "Chat ID"
+msgstr "会话 ID"
+
+#: htdocs/luci-static/resources/view/sim-relay/overview.js
+msgid "Check original request"
+msgstr "查询原请求"
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js
+msgid "Clear credentials"
+msgstr "清除凭据"
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js
+msgid "Clear this shared channel credentials, disable the channel and cancel pending forwards."
+msgstr "清除该共享通道的凭据并停用通道，取消尚未开始的推送。"
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "Confirm"
+msgstr "确认"
+
+#: htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "Confirmed successful"
+msgstr "已确认成功"
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js
+msgid "Credentials saved"
+msgstr "已保存凭据"
+
+#: htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "Delete device SMS"
+msgstr "删除设备短信"
+
+#: htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "Delete messages"
+msgstr "批量删除"
+
+#: htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "Delete selected messages"
+msgstr "删除选中短信"
+
+#: htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "Delete the saved PIN for this SIM and disable automatic unlock."
+msgstr "删除当前 SIM 已保存的 PIN，并关闭自动解锁。"
+
+#: htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "Delete these messages from the device? This cannot be undone."
+msgstr "确认删除设备上的这些短信？此操作不可撤销。"
+
+#: htdocs/luci-static/resources/view/sim-relay/overview.js
+msgid "Demo device"
+msgstr "演示设备"
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js htdocs/luci-static/resources/view/sim-relay/manage-pin.js htdocs/luci-static/resources/view/sim-relay/overview.js
+msgid "Details"
+msgstr "详情"
+
+#: htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "Device SMS (up to 100 messages)"
+msgstr "当前设备短信（最多显示 100 条）"
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js
+msgid "Device bindings"
+msgstr "设备关联"
+
+#: htdocs/luci-static/resources/view/sim-relay/overview.js
+msgid "Direction"
+msgstr "方向"
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js htdocs/luci-static/resources/view/sim-relay/overview.js
+msgid "Disabled"
+msgstr "停用"
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js
+msgid "Edit"
+msgstr "编辑"
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js
+msgid "Edit channel"
+msgstr "编辑通道"
+
+#: htdocs/luci-static/resources/view/sim-relay/overview.js
+msgid "Edit device"
+msgstr "编辑设备"
+
+#: htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "Enable automatic unlock"
+msgstr "启用自动解锁"
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js
+msgid "Enable signing"
+msgstr "启用签名"
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js htdocs/luci-static/resources/view/sim-relay/overview.js
+msgid "Enabled"
+msgstr "启用"
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js htdocs/luci-static/resources/view/sim-relay/manage-pin.js htdocs/luci-static/resources/view/sim-relay/overview.js
+msgid "Failed"
+msgstr "失败"
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js
+msgid "Feishu"
+msgstr "飞书"
+
+#: htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "Forget PIN"
+msgstr "忘记 PIN"
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js
+msgid "Forwarding number"
+msgstr "转发号码"
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js
+msgid "From address"
+msgstr "发件地址"
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js
+msgid "Implicit TLS"
+msgstr "直接 TLS"
+
+#: ../src
+msgid "Install the optional sim-relay-modemmanager package to enable PIN unlock."
+msgstr "请安装 sim-relay-modemmanager 可选包以启用 PIN 解锁"
+
+#: htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "Install the optional sim-relay-modemmanager package to unlock a local modem with a PIN."
+msgstr "本机模块 PIN 解锁需要安装可选包 sim-relay-modemmanager。"
+
+#: htdocs/luci-static/resources/view/sim-relay/overview.js
+msgid "Last sync (UTC):"
+msgstr "上次同步（UTC）："
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js
+msgid "Leave blank to keep existing credentials"
+msgstr "留空保留已有凭据"
+
+#: htdocs/luci-static/resources/view/sim-relay/overview.js
+msgid "Local cellular modem"
+msgstr "本机蜂窝模块"
+
+#: htdocs/luci-static/resources/view/sim-relay/overview.js
+msgid "Local cellular modem (ModemManager)"
+msgstr "本机蜂窝模块（ModemManager）"
+
+#: htdocs/luci-static/resources/view/sim-relay/overview.js
+msgid "Manage devices and browse SMS stored on the modem."
+msgstr "管理设备并查看设备中保存的短信。"
+
+#: htdocs/luci-static/resources/view/sim-relay/overview.js
+msgid "Management URL"
+msgstr "管理地址"
+
+#: htdocs/luci-static/resources/view/sim-relay/overview.js
+msgid "Message"
+msgstr "短信正文"
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js
+msgid "Message prefix"
+msgstr "消息前缀"
+
+#: htdocs/luci-static/resources/view/sim-relay/manage-pin.js root/usr/share/luci/menu.d/luci-app-sim-relay.json
+msgid "Messages"
+msgstr "短信"
+
+#: ../src
+msgid "ModemManager is not installed. Install the modemmanager package before adding a local cellular modem."
+msgstr "未安装 ModemManager，请先安装 modemmanager 软件包后再添加本机蜂窝设备"
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js htdocs/luci-static/resources/view/sim-relay/overview.js
+msgid "Name"
+msgstr "名称"
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js
+msgid "New bindings start from a history baseline. Existing progress resumes after restart. Failed forwards retry every minute."
+msgstr "首次关联建立历史基线；已有转发进度会在重启后继续，失败任务每分钟重试。"
+
+#: htdocs/luci-static/resources/view/sim-relay/overview.js
+msgid "Next"
+msgstr "下一页"
+
+#: htdocs/luci-static/resources/view/sim-relay/overview.js
+msgid "No modems are available in ModemManager."
+msgstr "ModemManager 暂未提供可添加的设备"
+
+#: htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "No saved PIN"
+msgstr "未保存 PIN"
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js
+msgid "No saved credentials"
+msgstr "未保存凭据"
+
+#: ../src htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "Number"
+msgstr "号码"
+
+#: htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "PIN (4-8 digits; leave blank to unlock with the saved PIN)"
+msgstr "PIN（4–8 位；解锁时留空可使用已保存的 PIN）"
+
+#: htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "PIN attempts remaining: "
+msgstr "PIN 剩余次数："
+
+#: htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "PIN required"
+msgstr "需要 PIN"
+
+#: htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "PIN saved and encrypted"
+msgstr "已加密保存 PIN"
+
+#: ../src htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "PIN unlock"
+msgstr "PIN 解锁"
+
+#: htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "PUK required"
+msgstr "需要 PUK"
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js
+msgid "Password"
+msgstr "密码"
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js
+msgid "Pending and recent forwards (successful records cleared on restart)"
+msgstr "待转发与最近推送（成功记录重启后清空）"
+
+#: htdocs/luci-static/resources/view/sim-relay/overview.js
+msgid "Poll interval (seconds)"
+msgstr "轮询间隔（秒）"
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js
+msgid "Port"
+msgstr "端口"
+
+#: htdocs/luci-static/resources/view/sim-relay/manage-pin.js htdocs/luci-static/resources/view/sim-relay/overview.js
+msgid "Preparing"
+msgstr "准备中"
+
+#: htdocs/luci-static/resources/view/sim-relay/overview.js
+msgid "Previous"
+msgstr "上一页"
+
+#: root/usr/share/luci/menu.d/luci-app-sim-relay.json
+msgid "Push channels"
+msgstr "推送通道"
+
+#: htdocs/luci-static/resources/view/sim-relay/manage-pin.js htdocs/luci-static/resources/view/sim-relay/overview.js
+msgid "Queued"
+msgstr "排队中"
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js
+msgid "Queued / waiting to retry"
+msgstr "待推送 / 等待重试"
+
+#: htdocs/luci-static/resources/view/sim-relay/overview.js
+msgid "Received"
+msgstr "已接收"
+
+#: htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "Recent device operations (cleared on restart)"
+msgstr "最近设备操作（重启后清空）"
+
+#: htdocs/luci-static/resources/view/sim-relay/overview.js
+msgid "Recent sends (cleared on restart)"
+msgstr "最近发送记录（重启后清空）"
+
+#: htdocs/luci-static/resources/view/sim-relay/overview.js
+msgid "Recipient"
+msgstr "接收号码"
+
+#: htdocs/luci-static/resources/view/sim-relay/overview.js
+msgid "Recipient number"
+msgstr "接收号码"
+
+#: htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "Refresh device status"
+msgstr "刷新设备状态"
+
+#: ../src htdocs/luci-static/resources/view/sim-relay/push-channels.js
+msgid "Remove"
+msgstr "移除"
+
+#: htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "Remove device"
+msgstr "移除设备"
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js
+msgid "Remove shared channel"
+msgstr "移除共享通道"
+
+#: htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "Remove this device, its saved SIM PIN and pending forwards."
+msgstr "移除设备及其已保存的 SIM PIN，并停止待转发任务。"
+
+#: htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "SIM / PIN"
+msgstr "SIM / PIN"
+
+#: root/usr/share/luci/menu.d/luci-app-sim-relay.json
+msgid "SIM Relay"
+msgstr "SIM Relay"
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js
+msgid "SIM SMS"
+msgstr "SIM 短信"
+
+#: htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "SIM and SMS cleanup"
+msgstr "SIM 与短信清理"
+
+#: root/usr/share/luci/menu.d/luci-app-sim-relay.json
+msgid "SIM and cleanup"
+msgstr "SIM 与清理"
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js
+msgid "SMTP email"
+msgstr "SMTP 邮件"
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js
+msgid "SMTP host"
+msgstr "SMTP 主机"
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js
+msgid "SMTP requires the optional sim-relay-smtp package, which provides a separate mail client with TLS support."
+msgstr "SMTP 需要安装可选的 sim-relay-smtp 包；该包包含独立的邮件 TLS 客户端。"
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js htdocs/luci-static/resources/view/sim-relay/overview.js
+msgid "Save"
+msgstr "保存"
+
+#: htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "Save PIN settings"
+msgstr "保存 PIN 设置"
+
+#: htdocs/luci-static/resources/view/sim-relay/overview.js
+msgid "Search sender or text"
+msgstr "搜索号码或正文"
+
+#: ../src htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "Select"
+msgstr "选择"
+
+#: htdocs/luci-static/resources/view/sim-relay/overview.js
+msgid "Select an enabled device with sending available"
+msgstr "请选择已启用且可以发送短信的设备"
+
+#: htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "Select messages first."
+msgstr "请先选择短信"
+
+#: ../src
+msgid "Select one of the discovered local cellular modems."
+msgstr "请选择一个已发现的本机蜂窝设备"
+
+#: htdocs/luci-static/resources/view/sim-relay/overview.js
+msgid "Send"
+msgstr "发送"
+
+#: htdocs/luci-static/resources/view/sim-relay/overview.js
+msgid "Send SMS"
+msgstr "发送短信"
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js
+msgid "Send a test SMS to the forwarding number using the selected device SIM."
+msgstr "将通过所选设备的 SIM 向转发号码发送测试短信。"
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js
+msgid "Send a test message to this channel."
+msgstr "向该通道发送一条测试消息。"
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js
+msgid "Send test"
+msgstr "发送测试"
+
+#: htdocs/luci-static/resources/view/sim-relay/overview.js
+msgid "Sender / recipient"
+msgstr "发送方 / 接收方"
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js htdocs/luci-static/resources/view/sim-relay/overview.js
+msgid "Sent"
+msgstr "已发送"
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js
+msgid "Shared push channels"
+msgstr "共享推送通道"
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js
+msgid "Signing secret"
+msgstr "签名密钥"
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js htdocs/luci-static/resources/view/sim-relay/manage-pin.js htdocs/luci-static/resources/view/sim-relay/overview.js
+msgid "Status"
+msgstr "状态"
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js
+msgid "Stop using this channel on all linked devices and cancel pending forwards."
+msgstr "所有关联设备将停止使用此通道，尚未开始的推送将取消。"
+
+#: htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "Submitted; awaiting confirmation"
+msgstr "已提交，确认中"
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js htdocs/luci-static/resources/view/sim-relay/overview.js
+msgid "Submitting"
+msgstr "提交中"
+
+#: htdocs/luci-static/resources/view/sim-relay/overview.js
+msgid "Sync now"
+msgstr "立即同步"
+
+#: htdocs/luci-static/resources/view/sim-relay/overview.js
+msgid "Sync queued"
+msgstr "已请求同步"
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js
+msgid "TLS mode"
+msgstr "TLS 模式"
+
+#: ../src htdocs/luci-static/resources/view/sim-relay/push-channels.js
+msgid "Test"
+msgstr "测试"
+
+#: ../src
+msgid "This local cellular modem has already been added."
+msgstr "该本机蜂窝设备已添加"
+
+#: htdocs/luci-static/resources/view/sim-relay/manage-pin.js htdocs/luci-static/resources/view/sim-relay/overview.js
+msgid "Time"
+msgstr "时间"
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js
+msgid "To address"
+msgstr "收件地址"
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js
+msgid "Type"
+msgstr "类型"
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js htdocs/luci-static/resources/view/sim-relay/manage-pin.js htdocs/luci-static/resources/view/sim-relay/overview.js
+msgid "Unconfirmed"
+msgstr "结果未确认"
+
+#: ../src htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "Unknown"
+msgstr "未知"
+
+#: htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "Unknown state"
+msgstr "状态未知"
+
+#: htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "Unlock once"
+msgstr "提交一次解锁"
+
+#: htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "Unlocked"
+msgstr "已解锁"
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js
+msgid "Username"
+msgstr "用户名"
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js
+msgid "Waiting for SIM send"
+msgstr "等待 SIM 发送"
+
+#: htdocs/luci-static/resources/view/sim-relay/overview.js
+msgid "Waiting for first sync"
+msgstr "等待首次同步"
+
+#: htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "Waiting for sync"
+msgstr "等待同步"
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js
+msgid "WeCom"
+msgstr "企业微信"
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js
+msgid "Webhook URL"
+msgstr "Webhook 地址"
+
+#: htdocs/luci-static/resources/view/sim-relay/overview.js
+msgid "ZTE supports up to 335 Unicode BMP characters. Local modems use ModemManager for encoding and segmentation."
+msgstr "ZTE: Unicode 最多 335 个 BMP 字符；本机模块由 ModemManager 处理短信编码和分段。"
+
+#: ../src
+msgid "A saved or valid PIN is required"
+msgstr "请输入有效 PIN，或先保存 PIN"
+
+#: ../src
+msgid "Bind an enabled channel to this device before testing"
+msgstr "测试前请先为设备关联一个已启用的通道"
+
+#: ../src
+msgid "Cannot allocate send request"
+msgstr "无法创建发送请求"
+
+#: ../src
+msgid "Cannot commit UCI configuration"
+msgstr "无法提交 UCI 配置"
+
+#: ../src
+msgid "Cannot identify SIM ICCID"
+msgstr "无法识别 SIM 卡 ICCID"
+
+#: ../src
+msgid "Cannot persist pending forward; progress not advanced"
+msgstr "无法保存待转发短信，进度未推进"
+
+#: ../src
+msgid "Cannot persist progress marker"
+msgstr "无法保存转发进度"
+
+#: ../src
+msgid "Cannot persist test message"
+msgstr "无法保存测试消息"
+
+#: ../src
+msgid "Cannot queue temporary action"
+msgstr "无法创建临时操作任务"
+
+#: ../src
+msgid "Cannot request refresh"
+msgstr "无法请求刷新"
+
+#: ../src
+msgid "Cannot update pending file"
+msgstr "无法更新待转发文件"
+
+#: ../src
+msgid "Channel missing or changed"
+msgstr "通道不存在或已修改"
+
+#: ../src
+msgid "Delete failed or unconfirmed; not retried"
+msgstr "删除失败或结果未确认，不会自动重试"
+
+#: ../src
+msgid "Device did not confirm acceptance"
+msgstr "设备未确认接收请求"
+
+#: ../src
+msgid "Device missing or disabled"
+msgstr "设备不存在或已停用"
+
+#: ../src
+msgid "Device not found"
+msgstr "未找到设备"
+
+#: ../src
+msgid "Device operation deadline exceeded"
+msgstr "设备操作超时"
+
+#: ../src
+msgid "Device or SIM changed"
+msgstr "设备或 SIM 卡已变化"
+
+#: ../src
+msgid "Device or SIM changed before sending"
+msgstr "发送前设备或 SIM 卡已变化"
+
+#: ../src
+msgid "Device or SIM changed before submission"
+msgstr "提交前设备或 SIM 卡已变化"
+
+#: ../src
+msgid "Device or SIM changed during sync; snapshot discarded"
+msgstr "同步期间设备或 SIM 卡已变化，已丢弃本次快照"
+
+#: ../src
+msgid "Device or SIM changed immediately before sending"
+msgstr "即将发送时设备或 SIM 卡已变化"
+
+#: ../src
+msgid "Device reported sending failed"
+msgstr "设备报告发送失败"
+
+#: ../src
+msgid "Device request failed, redirected, oversized or invalid response"
+msgstr "设备请求失败、发生重定向、响应过大或响应无效"
+
+#: ../src
+msgid "Expected a JSON object of at most 16 KiB, without NUL"
+msgstr "请求必须是不含 NUL、且不超过 16 KiB 的 JSON 对象"
+
+#: ../src
+msgid "Firmware write configuration unsupported or authentication required"
+msgstr "固件不支持当前写入配置，或需要身份验证"
+
+#: ../src
+msgid "Hardware identity or firmware mismatch"
+msgstr "硬件身份或固件不匹配"
+
+#: ../src
+msgid "Invalid SMS fields or UTF-16 encoding"
+msgstr "短信字段或 UTF-16 编码无效"
+
+#: ../src
+msgid "Invalid SMS list"
+msgstr "短信列表无效"
+
+#: ../src
+msgid "Invalid SMS number or text"
+msgstr "短信号码或正文无效"
+
+#: ../src
+msgid "Invalid adapter configuration"
+msgstr "适配器配置无效"
+
+#: ../src
+msgid "Invalid channel JSON or credentials"
+msgstr "通道 JSON 或凭据无效"
+
+#: ../src
+msgid "Invalid channel fields"
+msgstr "通道字段无效"
+
+#: ../src
+msgid "Invalid channel selection"
+msgstr "通道选择无效"
+
+#: ../src
+msgid "Invalid device JSON response"
+msgstr "设备 JSON 响应无效"
+
+#: ../src
+msgid "Invalid device configuration"
+msgstr "设备配置无效"
+
+#: ../src
+msgid "Invalid device request"
+msgstr "设备请求无效"
+
+#: ../src
+msgid "Invalid mmcli JSON output"
+msgstr "mmcli 的 JSON 输出无效"
+
+#: ../src
+msgid "Invalid modem list"
+msgstr "蜂窝模块列表无效"
+
+#: ../src
+msgid "Invalid or repeated SMS page"
+msgstr "短信分页无效或重复"
+
+#: ../src
+msgid "Invalid or stale channel configuration"
+msgstr "通道配置无效或已过期"
+
+#: ../src
+msgid "Invalid pagination"
+msgstr "分页参数无效"
+
+#: ../src
+msgid "Invalid recipient, encoding or message length"
+msgstr "接收号码、编码或短信长度无效"
+
+#: ../src
+msgid "Maximum 16 devices"
+msgstr "最多添加 16 个设备"
+
+#: ../src
+msgid "Maximum 32 channels"
+msgstr "最多添加 32 个通道"
+
+#: ../src
+msgid "Method unavailable in lightweight mode"
+msgstr "轻量模式不支持此操作"
+
+#: ../src
+msgid "Missing firmware AD challenge"
+msgstr "缺少固件 AD 认证参数"
+
+#: ../src
+msgid "Mock device does not require a PIN"
+msgstr "演示设备不需要 PIN"
+
+#: ../src
+msgid "Modem identity changed"
+msgstr "蜂窝模块身份已变化"
+
+#: ../src
+msgid "Modem or SIM changed"
+msgstr "蜂窝模块或 SIM 卡已变化"
+
+#: ../src
+msgid "ModemManager command failed, unavailable or timed out"
+msgstr "ModemManager 命令失败、不可用或超时"
+
+#: ../src
+msgid "Operation cancelled before submission"
+msgstr "操作已在提交前取消"
+
+#: ../src
+msgid "Operation not confirmed; never retried"
+msgstr "操作结果未确认，不会自动重试"
+
+#: ../src
+msgid "PIN failed or unconfirmed; automatic unlock blocked"
+msgstr "PIN 解锁失败或结果未确认，自动解锁已停止"
+
+#: ../src
+msgid "PIN lock or retry guard rejected operation"
+msgstr "PIN 锁定状态或剩余次数不允许提交"
+
+#: ../src
+msgid "PIN must contain 4..8 digits"
+msgstr "PIN 必须为 4 至 8 位数字"
+
+#: ../src
+msgid "PIN retry guard changed before submission"
+msgstr "提交前 PIN 剩余次数条件已变化"
+
+#: ../src
+msgid "PIN retry guard rejected operation"
+msgstr "PIN 剩余次数不允许提交"
+
+#: ../src
+msgid "Refresh SIM before unlocking"
+msgstr "解锁前请先刷新 SIM 状态"
+
+#: ../src
+msgid "Remove and re-add a device to change its adapter/address"
+msgstr "修改适配器或地址前，请移除后重新添加设备"
+
+#: ../src
+msgid "Request key already used with different SMS content"
+msgstr "此请求标识已用于不同的短信内容"
+
+#: ../src
+msgid "Request key required (1..128 bytes)"
+msgstr "必须提供请求标识，长度为 1 至 128 字节"
+
+#: ../src
+msgid "SIM absent or locked"
+msgstr "SIM 卡未插入或已锁定"
+
+#: ../src
+msgid "SIM changed or invalid SMS"
+msgstr "SIM 卡已变化，或短信无效"
+
+#: ../src
+msgid "SIM changed; refresh before saving PIN"
+msgstr "SIM 卡已变化，保存 PIN 前请先刷新"
+
+#: ../src
+msgid "SIM not ready; no PIN submitted"
+msgstr "SIM 卡尚未就绪，未提交 PIN"
+
+#: ../src
+msgid "SMS page limit reached; snapshot discarded"
+msgstr "已达到短信分页上限，已丢弃本次快照"
+
+#: ../src
+msgid "SMS slot changed before deletion"
+msgstr "删除前短信存储槽位已变化"
+
+#: ../src
+msgid "SMS snapshot exceeds memory budget; snapshot discarded"
+msgstr "短信快照超过内存限制，已丢弃本次快照"
+
+#: ../src
+msgid "SMS target missing or ambiguous"
+msgstr "目标短信不存在或匹配不唯一"
+
+#: ../src
+msgid "SMS target missing or slot ambiguous"
+msgstr "目标短信不存在或存储槽位不唯一"
+
+#: ../src
+msgid "Select 1..100 current device messages (scope=device)"
+msgstr "请选择 1 至 100 条当前设备短信，删除范围必须为设备"
+
+#: ../src
+msgid "Selected modem absent or ambiguous"
+msgstr "所选蜂窝模块不存在或匹配不唯一"
+
+#: ../src
+msgid "Send cancelled before submission"
+msgstr "发送已在提交前取消"
+
+#: ../src
+msgid "Sending result unconfirmed"
+msgstr "发送结果未确认"
+
+#: ../src
+msgid "Test key required"
+msgstr "必须提供测试请求标识"
+
+#: ../src
+msgid "Unknown method, duplicate field, or invalid argument type"
+msgstr "操作未知、字段重复或参数类型无效"
+
+#: ../src
+msgid "Unreadable pending file; retained for inspection"
+msgstr "无法读取待转发文件，已保留以便检查"
+
+#: ../src
+msgid "Unreadable progress marker; not reset automatically"
+msgstr "无法读取进度标记，不会自动重置"
+
+#: ../src
+msgid "Unsupported firmware, authentication required, or hardware identity changed"
+msgstr "固件不受支持、需要身份验证或硬件身份已变化"
+
+#: ../src
+msgid "Waiting for a complete multipart SMS"
+msgstr "正在等待多段短信接收完整"
+
+#: ../src
+msgid "feishu_delivery_rejected"
+msgstr "飞书拒绝接收消息"
+
+#: ../src
+msgid "feishu_delivery_unconfirmed"
+msgstr "飞书推送结果未确认"
+
+#: ../src
+msgid "invalid_push_configuration"
+msgstr "推送配置无效"
+
+#: ../src
+msgid "smtp_helper_missing"
+msgstr "未安装 SMTP 辅助客户端，请安装 sim-relay-smtp"
+
+#: ../src
+msgid "smtp_message_too_large"
+msgstr "SMTP 消息过大"
+
+#: ../src
+msgid "smtp_result_unconfirmed"
+msgstr "SMTP 发送结果未确认"
+
+#: ../src
+msgid "telegram_delivery_rejected"
+msgstr "Telegram 拒绝接收消息"
+
+#: ../src
+msgid "telegram_delivery_unconfirmed"
+msgstr "Telegram 推送结果未确认"
+
+#: ../src
+msgid "telegram_text_too_long"
+msgstr "Telegram 消息过长"
+
+#: ../src
+msgid "wecom_delivery_rejected"
+msgstr "企业微信拒绝接收消息"
+
+#: ../src
+msgid "wecom_delivery_unconfirmed"
+msgstr "企业微信推送结果未确认"
+
+#: ../src
+msgid "wecom_text_too_long"
+msgstr "企业微信消息过长"
+
+#: htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "This session has read-only access. Sign in with an account that can manage SIM Relay."
+msgstr "当前会话只有只读权限，请使用有权管理 SIM Relay 的账号重新登录。"
+
+#: htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "Waiting for SIM identification. Refresh device status before saving a PIN."
+msgstr "正在等待识别 SIM 卡，保存 PIN 前请刷新设备状态。"
+
+#: ../src/modemmanager.c
+msgid "SIM is unlocked, but the modem is disabled. Enable the modem in ModemManager to use SMS."
+msgstr "SIM 已解锁，但蜂窝模块尚未启用。请通过 ModemManager 启用模块以使用短信。"
+
+#: ../src/modemmanager.c
+msgid "PIN result not yet confirmed by ModemManager; do not retry automatically"
+msgstr "ModemManager 尚未确认 PIN 结果，不会自动重试。"
+
+#: ../src/modemmanager.c
+msgid "Unable to enable modem in ModemManager"
+msgstr "无法通过 ModemManager 启用蜂窝模块"
+
+#: ../src/modemmanager.c
+msgid "Modem or SIM changed while enabling"
+msgstr "启用过程中蜂窝模块或 SIM 卡已变化"
+
+#: ../src/lite.c
+msgid "Some device data could not be removed"
+msgstr "部分设备数据无法删除"
+
+#: ../src/lite.c
+msgid "This ZTE device address has already been added."
+msgstr "该中兴设备地址已添加。"

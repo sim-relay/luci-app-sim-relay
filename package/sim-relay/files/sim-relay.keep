@@ -1,0 +1,4 @@
+/etc/config/sim-relay
+/etc/sim-relay/credentials.key
+/etc/sim-relay/cursor-*.json
+/etc/sim-relay/pending/
