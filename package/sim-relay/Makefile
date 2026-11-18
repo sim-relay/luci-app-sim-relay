@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=sim-relay
 PKG_VERSION:=0.6.0
-PKG_RELEASE:=6
+PKG_RELEASE:=10
 PKG_LICENSE:=MIT
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)-$(PKG_VERSION)
 PKG_BUILD_PARALLEL:=1
@@ -14,7 +14,7 @@ define Package/sim-relay
   SECTION:=net
   CATEGORY:=Network
   TITLE:=Lightweight multi-device SIM SMS service
-  DEPENDS:=+libcurl +cJSON +rpcd +libsodium +uci
+  DEPENDS:=+libcurl +cJSON +rpcd +libsodium +uci +msmtp +ca-bundle +uhttpd +jsonfilter
 endef
 
 define Package/sim-relay/conffiles
@@ -34,9 +34,17 @@ define Package/sim-relay/install
 	chmod 0700 $(1)/etc/sim-relay
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/sim-relayd $(1)/usr/sbin/
 	$(INSTALL_BIN) ./files/sim-relay.init $(1)/etc/init.d/sim-relay
+	$(INSTALL_BIN) ./files/sim-relay-api.init $(1)/etc/init.d/sim-relay-api
+	$(INSTALL_BIN) ./files/sim-relay-api.cgi $(1)/usr/libexec/sim-relay-api
 	$(INSTALL_BIN) ./files/sim-relay.rpc $(1)/usr/libexec/rpcd/sim-relay
 	$(INSTALL_CONF) ./files/sim-relay.config $(1)/etc/config/sim-relay
 	$(INSTALL_DATA) ./files/sim-relay.keep $(1)/lib/upgrade/keep.d/sim-relay
+endef
+
+define Package/sim-relay/postinst
+#!/bin/sh
+[ -n "$${IPKG_INSTROOT}" ] || /etc/init.d/sim-relay-api enable
+exit 0
 endef
 
 $(eval $(call BuildPackage,sim-relay))

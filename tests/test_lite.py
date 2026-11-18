@@ -62,6 +62,107 @@ class LiteCase(unittest.TestCase):
         return list((self.state_dir / 'pending').glob('*.json'))
 
 class LiteTests(LiteCase):
+    def api_request(self, method, path, token='', body=None, query='', remote='192.168.1.23', secure=True, revision=None):
+        data = json.dumps(body or {}) if body is not None else ''
+        api = json.loads(self.config.read_text()).get('api', {})
+        docroot = self.run_dir / f"api-{api.get('revision', 0) if revision is None else revision}"
+        docroot.mkdir(exist_ok=True)
+        (docroot / 'allowed-subnets').write_text('127.0.0.0/8\n192.168.1.1/24\nfd01::1/64\n')
+        env = dict(self.env, REQUEST_METHOD=method, PATH_INFO=path, QUERY_STRING=query,
+                   HTTP_AUTHORIZATION=('Bearer ' + token if token else ''),
+                   CONTENT_TYPE='application/json', CONTENT_LENGTH=str(len(data.encode())), HTTPS='on' if secure else '',
+                   REMOTE_ADDR=remote, DOCUMENT_ROOT=str(docroot))
+        result = subprocess.run([str(BINARY), 'api'], input=data, text=True, capture_output=True,
+                                env=env, check=True, timeout=15)
+        header, result_body = result.stdout.split('\n\n', 1)
+        return int(header.split()[1]), json.loads(result_body)
+
+    def test_api_settings_hide_token_and_reject_invalid_values(self):
+        token = 'a' * 64
+        self.assertIn('error', self.call('save_api_settings', enabled=1, scope='lan', port=8848, token=''))
+        self.assertIn('error', self.call('save_api_settings', enabled=1, scope='lan', port=8848, token='short'))
+        self.assertNotIn('error', self.call('save_api_settings', enabled=1, scope='lan', port=8848, token=token))
+        self.assertNotIn(token, self.config.read_text())
+        self.assertNotIn(token, json.dumps(self.call('api_settings')))
+        self.assertTrue(self.call('api_settings')['has_token'])
+
+    def test_api_authentication_send_and_status(self):
+        token = 'b' * 64
+        self.assertEqual(self.api_request('GET', '/v1/devices', token)[0], 404)
+        self.call('save_api_settings', enabled=1, scope='lan', port=8848, token=token)
+        self.assertEqual(self.api_request('GET', '/v1/devices', 'c' * 64)[0], 401)
+        self.assertEqual(self.api_request('GET', '/v1/devices', token, secure=False)[0], 403)
+        self.assertEqual(self.api_request('GET', '/v1/devices', token, revision=99)[0], 503)
+        self.assertEqual(self.api_request('GET', '/v1/devices', token, remote='203.0.113.1')[0], 403)
+        self.assertEqual(self.api_request('GET', '/v1/devices', token, remote='fd01::123')[0], 200)
+        status, devices = self.api_request('GET', '/v1/devices', token)
+        self.assertEqual(status, 200); self.assertEqual(devices['items'][0]['id'], self.device)
+        self.poll()
+        request = dict(device_id=self.device, request_id='test-1', number='13800000000', text='hello')
+        status, queued = self.api_request('POST', '/v1/messages', token, request)
+        self.assertEqual(status, 202); self.assertEqual(queued['status'], 'queued')
+        self.assertNotIn('number', queued); self.assertNotIn('text', queued)
+        self.assertEqual(self.api_request('POST', '/v1/messages', token, request)[0], 202)
+        status, queued = self.api_request('GET', '/v1/messages', token, query=f'device_id={self.device}&request_id=test-1')
+        self.assertEqual(status, 200); self.assertEqual(queued['status'], 'queued')
+        self.poll()
+        status, sent = self.api_request('GET', '/v1/messages', token, query=f'request_id=test-1&device_id={self.device}')
+        self.assertEqual(status, 200); self.assertEqual(sent['status'], 'sent'); self.assertEqual(self.state()['posts'], 1)
+        self.assertEqual(self.api_request('POST', '/v1/messages', token, {**request, 'text': 'different'})[0], 400)
+        self.assertEqual(self.api_request('GET', '/v1/messages', token, query='device_id=1&request_id=missing')[0], 404)
+        self.assertEqual(self.api_request('POST', '/v1/messages', token, {**request, 'request_id': '../unsafe'})[0], 400)
+
+    def test_api_rate_limit(self):
+        token = 'd' * 64
+        self.call('save_api_settings', enabled=1, scope='any', port=8848, token=token)
+        self.assertEqual(self.api_request('GET', '/v1/devices', token, remote='203.0.113.1')[0], 200)
+        request = dict(device_id=self.device, request_id='same-key', number='13800000000', text='hello')
+        for _ in range(30): self.assertEqual(self.api_request('POST', '/v1/messages', token, request)[0], 202)
+        self.assertEqual(self.api_request('POST', '/v1/messages', token, request)[0], 429)
+
+    def test_api_retry_returns_existing_failed_result(self):
+        token = 'f' * 64
+        self.call('save_api_settings', enabled=1, scope='lan', port=8848, token=token)
+        self.poll()
+        request = dict(device_id=self.device, request_id='failed-once', number='13800000000', text='hello')
+        self.assertEqual(self.api_request('POST', '/v1/messages', token, request)[0], 202)
+        self.change(mode='reject'); self.poll()
+        code, result = self.api_request('POST', '/v1/messages', token, request)
+        self.assertEqual(code, 202); self.assertEqual(result['status'], 'failed'); self.assertEqual(self.state()['posts'], 1)
+
+    def test_api_rejects_full_queue_and_disabled_service(self):
+        token = 'e' * 64
+        self.call('save_api_settings', enabled=1, scope='lan', port=8848, transport='http', token=token)
+        self.assertEqual(self.api_request('GET', '/v1/devices', token, secure=False)[0], 200)
+        for i in range(64): (self.run_dir / 'actions' / f'full-{i}.json').write_text('{}')
+        request = dict(device_id=self.device, request_id='new', number='13800000000', text='hello')
+        self.assertEqual(self.api_request('POST', '/v1/messages', token, request)[0], 429)
+        self.call('save_api_settings', enabled=0, scope='lan', port=8848, transport='http', token='')
+        self.assertEqual(self.api_request('GET', '/v1/devices', token, secure=False)[0], 404)
+
+    def test_api_invalid_scope_fails_closed(self):
+        token = 'a' * 64
+        self.call('save_api_settings', enabled=1, scope='lan', port=8848, token=token)
+        config = json.loads(self.config.read_text()); config['api']['scope'] = 'invalid'
+        self.config.write_text(json.dumps(config))
+        self.assertEqual(self.api_request('GET', '/v1/devices', token)[0], 503)
+
+    def test_webhook_credentials_are_encrypted_and_preserved_on_edit(self):
+        config = {'method': 'POST', 'body': '{"text":{{message_json}}}'}
+        secrets = {'url': 'http://127.0.0.1:1234/?token=secret-url', 'headers': 'Authorization: Bearer secret-header'}
+        created = self.call('save_channel', id=0, name='Webhook', kind='webhook', enabled=1, version=0,
+                            config=json.dumps(config), secrets=json.dumps(secrets))
+        self.assertNotIn('error', created)
+        channels = self.call('channels')['items']
+        self.assertNotIn('secret-url', json.dumps(channels))
+        self.assertNotIn('secret-header', json.dumps(channels))
+        saved = self.config.read_text()
+        self.assertNotIn('secret-url', saved)
+        self.assertNotIn('secret-header', saved)
+        edited = self.call('save_channel', id=created['id'], name='Webhook', kind='webhook', enabled=1,
+                           version=channels[0]['version'], config=json.dumps(config), secrets='{}')
+        self.assertNotIn('error', edited)
+
     def test_first_sync_baseline_and_new_message(self):
         self.channel(); self.change(messages=[self.message(1, 1)]); self.poll()
         self.assertEqual(self.state().get('push_attempts', 0), 0)
@@ -74,9 +175,91 @@ class LiteTests(LiteCase):
         self.channel(); self.change(messages=[self.message(1, 1)]); self.poll()
         self.change(messages=[self.message(i, i) for i in range(1, 8)])
         self.poll(reset=True)
-        self.assertEqual(self.state()['push_attempts'], 6)
-        self.assertFalse(self.pending())
+        self.assertEqual(self.state()['push_attempts'], 4)
+        self.assertEqual(len(self.pending()), 2)
         self.poll(reset=True); self.assertEqual(self.state()['push_attempts'], 6)
+        self.assertFalse(self.pending())
+
+    def test_forward_does_not_truncate_long_message(self):
+        self.channel(); self.poll()
+        message = 'A' * 9000 + '中文'
+        self.change(messages=[self.message(1, 1, message)]); self.poll()
+        self.assertIn(message, self.state()['last_push_text'])
+        self.assertFalse(self.pending())
+
+    def test_disabling_channel_during_device_read_cancels_forward(self):
+        channel = self.channel(); self.poll()
+        self.change(mode='slow', status_reads=0, messages=[self.message(1, 1)])
+        self.call('sync', device_id=self.device)
+        worker = subprocess.Popen([str(BINARY), 'poll'], env=self.env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        try:
+            time.sleep(0.5)
+            row = self.call('channels')['items'][0]
+            result = self.call('save_channel', id=channel, name='disabled', kind='wecom', enabled=0,
+                               version=row['version'], config='{}', secrets='{}')
+            self.assertNotIn('error', result)
+            worker.communicate(timeout=15)
+            self.assertEqual(worker.returncode, 0)
+            self.assertEqual(self.state().get('push_attempts', 0), 0)
+        finally:
+            if worker.poll() is None:
+                worker.kill(); worker.communicate()
+
+    def test_send_is_not_repeated_after_crash_at_submission(self):
+        self.poll()
+        self.call('send', device_id=self.device, key='crash-send', number='13800000000', text='test')
+        self.change(mode='post_crash')
+        self.assertNotEqual(self.run_binary('poll', check=False).returncode, 0)
+        self.assertEqual(self.state()['posts'], 1)
+        self.change(mode='normal'); self.run_binary('poll')
+        self.assertEqual(self.state()['posts'], 1)
+        history = self.call('send_history', device_id=self.device)['items']
+        self.assertEqual(history[-1]['status'], 'unconfirmed')
+
+    def test_manual_pin_is_not_repeated_after_crash_at_submission(self):
+        self.change(modem_state='modem_waitpin'); self.poll()
+        iccid = self.call('sim_info', device_id=self.device)['iccid']
+        self.call('unlock_pin', device_id=self.device, iccid=iccid, pin='0000', key='crash-pin', force=0)
+        self.change(mode='post_crash')
+        self.assertNotEqual(self.run_binary('poll', check=False).returncode, 0)
+        self.assertEqual(self.state()['posts'], 1)
+        self.change(mode='normal'); self.run_binary('poll')
+        self.assertEqual(self.state()['posts'], 1)
+
+    def test_auto_pin_attempt_survives_worker_restart(self):
+        self.change(modem_state='modem_waitpin'); self.poll()
+        iccid = self.call('sim_info', device_id=self.device)['iccid']
+        self.call('save_pin', device_id=self.device, iccid=iccid, pin='1234', auto_enabled=1)
+        self.change(mode='post_crash')
+        self.call('sync', device_id=self.device)
+        self.assertNotEqual(self.run_binary('poll', check=False).returncode, 0)
+        self.assertEqual(self.state()['posts'], 1)
+        self.assertEqual(json.loads(self.config.read_text())['pins'][0]['auto_attempted'], 1)
+        self.change(mode='normal'); self.poll(reset=True)
+        self.assertEqual(self.state()['posts'], 1)
+        self.change(modem_state='modem_init_complete'); self.poll()
+        self.assertEqual(json.loads(self.config.read_text())['pins'][0].get('auto_attempted', 0), 0)
+
+    def test_oversized_runtime_is_reported_and_preserved(self):
+        path = self.run_dir / 'state.json'
+        data = b' ' * (4 * 1024 * 1024 + 1)
+        path.write_bytes(data)
+        self.assertIn('error', self.call('devices'))
+        self.run_binary('poll')
+        self.assertEqual(path.read_bytes(), data)
+
+    def test_uci_subprocess_timeout_releases_lock(self):
+        helper = self.root / 'hung-uci'
+        helper.write_text('#!/bin/sh\nsleep 30\n'); helper.chmod(0o700)
+        local_config = self.env.pop('SIM_RELAY_CONFIG')
+        self.env['SIM_RELAY_TEST_UCI'] = str(helper)
+        self.env['SIM_RELAY_TEST_UCI_TIMEOUT_MS'] = '200'
+        start = time.monotonic()
+        result = self.run_binary('call', 'status', check=False)
+        self.assertLess(time.monotonic() - start, 3)
+        self.assertNotEqual(result.returncode, 0)
+        self.env['SIM_RELAY_CONFIG'] = local_config
+        self.assertTrue(self.call('status')['ok'])
 
     def test_pending_recovered_even_when_modem_copy_deleted(self):
         self.channel(); self.poll()
@@ -121,7 +304,11 @@ class LiteTests(LiteCase):
         self.change(messages=[self.message(1, 1)]); self.poll()
         self.assertEqual(cursor.read_bytes(), before)
         self.assertIn('Cannot persist', self.call('devices')['items'][0]['last_error'])
-        self.poll(); self.assertEqual(self.state()['push_attempts'], 1)
+        # Empty orphan files are removed in bounded batches; the forward follows them.
+        for _ in range(10):
+            self.poll()
+            if self.state().get('push_attempts', 0): break
+        self.assertEqual(self.state()['push_attempts'], 1)
 
     def test_corrupt_progress_is_retained_and_reported(self):
         self.channel(); self.poll(); p = self.state_dir / f'cursor-{self.device}.json'; p.write_text('invalid')
@@ -196,6 +383,15 @@ class LiteTests(LiteCase):
         self.assertFalse(self.state()['messages'])
         self.assertEqual(self.call('operation_history', device_id=self.device)['items'][0]['status'], 'succeeded')
 
+    def test_keep_recent_messages_prunes_oldest(self):
+        self.call('save_device', id=self.device, name='SIM 测试', adapter='zte_mf833u1',
+                  base_url='http://192.0.2.1', poll_interval=30, enabled=1, keep_messages=2)
+        self.change(messages=[self.message(i, i) for i in range(1, 6)])
+        self.poll()
+        remaining = self.state()['messages']
+        self.assertEqual(sorted(int(m['id']) for m in remaining), [4, 5])
+        self.assertEqual(len(self.call('messages', device_id=self.device)['items']), 2)
+
     def test_save_pin_encrypts_and_unlocks(self):
         self.change(modem_state='modem_waitpin'); self.poll()
         iccid = self.call('sim_info', device_id=self.device)['iccid']
@@ -256,6 +452,15 @@ class LiteTests(LiteCase):
         self.config.write_text(json.dumps(state))
         self.call('remove_device',device_id=self.device)
         self.assertEqual([p['iccid'] for p in json.loads(self.config.read_text())['pins']],['8986009999999999999'])
+
+    def test_removing_old_device_preserves_moved_sim_pin(self):
+        self.change(modem_state='modem_waitpin'); self.poll()
+        other = self.call('save_device', name='second', adapter='zte_mf833u1', base_url='http://192.0.2.2')['id']
+        self.poll()
+        iccid = self.call('sim_info', device_id=other)['iccid']
+        self.call('save_pin', device_id=other, iccid=iccid, pin='1234', auto_enabled=0)
+        self.assertNotIn('error', self.call('remove_device', device_id=self.device))
+        self.assertEqual(json.loads(self.config.read_text())['pins'][0]['device_id'], other)
 
     def test_remove_pin_with_missing_runtime_and_legacy_pin_record(self):
         self.poll(); iccid=self.call('sim_info',device_id=self.device)['iccid']

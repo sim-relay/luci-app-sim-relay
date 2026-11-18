@@ -45,12 +45,51 @@ static int webhook(const char *kind, const char *url) {
 end:
     curl_free(scheme); curl_free(host); curl_free(path); curl_free(query); if (u) curl_url_cleanup(u); return ok;
 }
+static int custom_url(const char *url) {
+    char example[4096]; size_t used=0;
+    if (!*url || strlen(url)>2048 || strpbrk(url,"\r\n\t ")) return 0;
+    while (*url) {
+        if (!strncmp(url,"{{message}}",11)) { example[used++]='x'; url+=11; }
+        else example[used++]=*url++;
+    }
+    example[used]=0;
+    CURLU *u=curl_url(); char *scheme=NULL,*host=NULL,*part=NULL; int ok=0;
+    if (!u || curl_url_set(u,CURLUPART_URL,example,0)!=CURLUE_OK ||
+        curl_url_get(u,CURLUPART_SCHEME,&scheme,0) ||
+        (strcmp(scheme,"http") && strcmp(scheme,"https")) ||
+        curl_url_get(u,CURLUPART_HOST,&host,0) || !*host) goto end;
+    CURLUPart forbidden[]={CURLUPART_USER,CURLUPART_PASSWORD,CURLUPART_FRAGMENT};
+    for (size_t i=0;i<3;i++) if (curl_url_get(u,forbidden[i],&part,0)==CURLUE_OK) goto end;
+    ok=1;
+end:
+    curl_free(part); curl_free(scheme); curl_free(host); if (u) curl_url_cleanup(u); return ok;
+}
+static int custom_headers(const char *headers) {
+    if (strlen(headers)>2048) return 0;
+    const char *p=headers;
+    while (*p) {
+        const char *end=strchr(p,'\n'); if (!end) end=p+strlen(p);
+        const char *last=end; if (last>p && last[-1]=='\r') last--;
+        if (last>p) {
+            const char *colon=memchr(p,':',(size_t)(last-p));
+            if (!colon || colon==p) return 0;
+            for (const char *q=p;q<colon;q++)
+                if (!strchr("!#$%&'*+-.^_`|~0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",*q)) return 0;
+            for (const char *q=colon+1;q<last;q++)
+                if (((unsigned char)*q<32 && *q!='\t') || (unsigned char)*q==127) return 0;
+        }
+        p=*end?end+1:end;
+    }
+    return 1;
+}
 int push_validate(const char *kind, J *c, J *s) {
     const char *fields=!strcmp(kind,"sms")?"|number|prefix|":!strcmp(kind,"telegram")?"|chat_id|prefix|":
         !strcmp(kind,"feishu")?"|prefix|signing_enabled|":!strcmp(kind,"wecom")?"|prefix|":
-        !strcmp(kind,"smtp")?"|host|port|from|to|username|tls_mode|prefix|":"";
+        !strcmp(kind,"smtp")?"|host|port|from|to|username|tls_mode|prefix|":
+        !strcmp(kind,"webhook")?"|method|body|prefix|":"";
     const char *secret_fields=!strcmp(kind,"telegram")?"|token|":!strcmp(kind,"feishu")?"|webhook_url|signing_secret|":
-        !strcmp(kind,"wecom")?"|webhook_url|":!strcmp(kind,"smtp")?"|password|":"|";
+        !strcmp(kind,"wecom")?"|webhook_url|":!strcmp(kind,"smtp")?"|password|":
+        !strcmp(kind,"webhook")?"|url|headers|":"|";
     J *item;
     cJSON_ArrayForEach(item,c) {
         char field[128];
@@ -93,6 +132,11 @@ int push_validate(const char *kind, J *c, J *s) {
             email(str(c,"from")) && email(str(c,"to")) && *str(c,"username") && strlen(str(c,"username"))<=255 &&
             !strpbrk(str(c,"username"),"\r\n") && *str(s,"password") && strlen(str(s,"password"))<=2048 && !strpbrk(str(s,"password"),"\r\n") &&
             (!strcmp(str(c,"tls_mode"),"starttls") || !strcmp(str(c,"tls_mode"),"tls"));
+    }
+    if (!strcmp(kind,"webhook")) {
+        const char *method=str(c,"method");
+        return (!strcmp(method,"GET") || !strcmp(method,"POST") || !strcmp(method,"PUT")) &&
+            strlen(str(c,"body"))<=4096 && custom_url(str(s,"url")) && custom_headers(str(s,"headers"));
     }
     return 0;
 }

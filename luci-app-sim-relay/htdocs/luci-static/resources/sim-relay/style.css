@@ -1,0 +1,120 @@
+/* Keep colors and control appearance supplied by the active LuCI theme. */
+.sim-relay-field {
+	display: grid;
+	grid-template-columns: minmax(10rem, 15rem) minmax(0, 1fr);
+	align-items: start;
+	gap: .5rem 1rem;
+}
+
+.sim-relay-field > .cbi-value-title,
+.sim-relay-field > .cbi-value-field {
+	float: none;
+	width: auto;
+	margin: 0;
+	padding: 0;
+	min-width: 0;
+}
+
+.sim-relay-field > .cbi-value-title {
+	text-align: start;
+}
+
+.sim-relay-field input:not([type="checkbox"]),
+.sim-relay-field select,
+.sim-relay-field textarea {
+	box-sizing: border-box;
+	width: 100%;
+	max-width: 100%;
+}
+
+.sim-relay-field .sim-relay-help:not(:empty) {
+	margin-top: .35rem;
+	line-height: 1.4;
+}
+
+.sim-relay-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: .5rem;
+	margin: 1rem 0;
+}
+
+.sim-relay-table-wrap {
+	max-width: 100%;
+	overflow-x: auto;
+}
+
+/* Allow LuCI's dropdown menu to extend outside the scrollable table. */
+.sim-relay-table-wrap:has(.sim-relay-associations .cbi-dropdown[open]) {
+	overflow: visible;
+}
+
+.sim-relay .sim-relay-associations {
+	overflow: visible;
+}
+
+.sim-relay-associations .cbi-dropdown {
+	width: 100%;
+	min-width: 12rem;
+	text-align: start;
+}
+
+.sim-relay .table {
+	width: 100%;
+	min-width: 40rem;
+	background-color: transparent;
+	color: inherit;
+}
+
+/* Some themes give native table headers a light background even in dark mode. */
+.sim-relay .table tr.table-titles,
+.sim-relay .table tr.table-titles > th {
+	background-color: transparent;
+	color: inherit;
+}
+
+.sim-relay .table th,
+.sim-relay .table td {
+	border-top: 1px solid var(--border-color-medium, #aaa);
+	padding: 10px 10px 9px;
+	line-height: 18px;
+	vertical-align: top;
+	text-align: center;
+	overflow-wrap: anywhere;
+}
+
+.sim-relay .table th {
+	font-weight: bold;
+}
+
+/* Give long SMS text a predictable share of the table instead of letting it
+   squeeze the sender, time and direction columns. */
+.sim-relay .sim-relay-messages {
+	table-layout: fixed;
+}
+
+.sim-relay-messages th:nth-child(1) { width: 6%; }
+.sim-relay-messages th:nth-child(2) { width: 21%; }
+.sim-relay-messages th:nth-child(3) { width: 37%; }
+.sim-relay-messages th:nth-child(4) { width: 24%; }
+.sim-relay-messages th:nth-child(5) { width: 12%; }
+
+.sim-relay .table td .btn {
+	margin: 0 .25rem .25rem 0;
+}
+
+.sim-relay .sim-relay-empty {
+	text-align: center;
+}
+
+@media (max-width: 600px) {
+	.sim-relay-field {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.sim-relay .table { display: table; }
+	.sim-relay .table tr,
+	.sim-relay .table tr.table-titles { display: table-row; }
+	.sim-relay .table th,
+	.sim-relay .table td { display: table-cell; }
+}

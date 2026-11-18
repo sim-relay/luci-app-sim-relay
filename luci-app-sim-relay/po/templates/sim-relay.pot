@@ -383,10 +383,6 @@ msgstr ""
 msgid "SMTP host"
 msgstr ""
 
-#: htdocs/luci-static/resources/view/sim-relay/push-channels.js
-msgid "SMTP requires the optional sim-relay-smtp package, which provides a separate mail client with TLS support."
-msgstr ""
-
 #: htdocs/luci-static/resources/view/sim-relay/push-channels.js htdocs/luci-static/resources/view/sim-relay/overview.js
 msgid "Save"
 msgstr ""
@@ -949,4 +945,177 @@ msgstr ""
 
 #: ../src/lite.c
 msgid "This ZTE device address has already been added."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/sim-relay/overview.js htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "Device"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/sim-relay/overview.js
+msgid "Devices"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js
+msgid "No channels have been added."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js
+msgid "No forwards yet."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/sim-relay/overview.js htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "No messages found."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "No operations yet."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/sim-relay/overview.js
+msgid "No recent sends."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "0 = keep all messages"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "Automatic cleanup keeps the newest N messages and removes older ones."
+msgstr ""
+
+#: root/usr/share/luci/menu.d/luci-app-sim-relay.json htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "Devices and SIM"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/sim-relay/overview.js htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "Keep recent messages"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "SIM"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "Set PIN"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/sim-relay/overview.js
+msgid "Browse, send and delete SMS on the selected device."
+msgstr ""
+
+#: htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "PIN (4-8 digits)"
+msgstr ""
+
+#: htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "PIN attempts"
+msgstr ""
+
+
+msgid "Request method"
+msgstr ""
+
+
+msgid "Request headers"
+msgstr ""
+
+
+msgid "Request body"
+msgstr ""
+
+
+msgid "Use {{message}} in the URL for URL-encoded message text."
+msgstr ""
+
+
+msgid "Enter one header per line, for example Content-Type: application/json."
+msgstr ""
+
+
+msgid "Clear saved request headers"
+msgstr ""
+
+
+msgid "Use {{message}} for plain text, or {{message_json}} for a JSON string including quotes."
+msgstr ""
+
+
+msgid "webhook_template_too_large"
+msgstr ""
+
+
+msgid "webhook_delivery_rejected"
+msgstr ""
+
+
+msgid "webhook_delivery_unconfirmed"
+msgstr ""
+
+msgid "Operation interrupted after submission; do not retry automatically"
+msgstr ""
+
+msgid "Runtime state unreadable; retained for inspection"
+msgstr ""
+
+msgid "Runtime snapshot too large; progress not advanced"
+msgstr ""
+
+msgid "Cannot save operation result; task retained"
+msgstr ""
+
+msgid "Cannot allocate forward message"
+msgstr ""
+
+msgid "Invalid pending file; retained for inspection"
+msgstr ""
+
+msgid "Remote API"
+msgstr ""
+
+msgid "Local network only"
+msgstr ""
+
+msgid "All networks"
+msgstr ""
+
+msgid "HTTPS (router certificate)"
+msgstr ""
+
+msgid "Leave blank to keep the current token"
+msgstr ""
+
+msgid "Generate token"
+msgstr ""
+
+msgid "API settings saved. Copy the token before leaving this page."
+msgstr ""
+
+msgid "Enable remote API"
+msgstr ""
+
+msgid "Access scope"
+msgstr ""
+
+msgid "All networks listens on all interfaces; firewall rules still control external access."
+msgstr ""
+
+msgid "Transport"
+msgstr ""
+
+msgid "HTTPS uses the router uhttpd certificate and SSL provider. HTTP sends the token without encryption."
+msgstr ""
+
+msgid "API token"
+msgstr ""
+
+msgid "The token is shown only here. Copy it before leaving; a new token replaces the old one."
+msgstr ""
+
+msgid "API requests use a Bearer token. See the project API documentation for endpoints and examples."
+msgstr ""
+
+msgid "Invalid API settings"
+msgstr ""
+
+msgid "Generate an API token before enabling the service"
 msgstr ""

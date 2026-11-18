@@ -2,6 +2,8 @@
 #include <assert.h>
 #include <stdarg.h>
 #include <sys/stat.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
 #define access relay_test_access
 #define execl relay_test_execl
 #include "../src/push_transport.c"
@@ -27,6 +29,39 @@ int relay_test_execl(const char *path, const char *arg0, ...) {
     fclose(config);
     while ((n=fread(buffer,1,sizeof(buffer),stdin))) assert(fwrite(buffer,1,n,output)==n);
     fclose(output); _exit(helper_exit);
+}
+static void check_webhook(const char *method, const char *body, const char *expect_path,
+                          const char *expect_body, const char *message, int status, int expected) {
+    int fd=socket(AF_INET,SOCK_STREAM,0); assert(fd>=0);
+    struct sockaddr_in addr={0}; addr.sin_family=AF_INET; addr.sin_addr.s_addr=htonl(INADDR_LOOPBACK);
+    assert(bind(fd,(struct sockaddr *)&addr,sizeof(addr))==0 && listen(fd,1)==0);
+    socklen_t len=sizeof(addr); assert(getsockname(fd,(struct sockaddr *)&addr,&len)==0);
+    pid_t child=fork(); assert(child>=0);
+    if (!child) {
+        alarm(5); int client=accept(fd,NULL,NULL); assert(client>=0); char request[16384]={0}; size_t used=0;
+        while (used<sizeof(request)-1) {
+            ssize_t n=read(client,request+used,sizeof(request)-1-used); assert(n>0); used+=(size_t)n; request[used]=0;
+            char *end=strstr(request,"\r\n\r\n");
+            if (end) {
+                char *length=strstr(request,"Content-Length:"); size_t content=length?(size_t)strtoul(length+15,NULL,10):0;
+                if (used>=(size_t)(end+4-request)+content) break;
+            }
+        }
+        char first[512]; snprintf(first,sizeof(first),"%s %s HTTP/",method,expect_path);
+        assert(!strncmp(request,first,strlen(first)) && strstr(request,"X-Test: value"));
+        char *actual=strstr(request,"\r\n\r\n"); assert(actual); actual+=4;
+        assert(!strcmp(actual,expect_body));
+        char response[128]; int n=snprintf(response,sizeof(response),"HTTP/1.1 %d Test\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",status);
+        assert(write(client,response,(size_t)n)==n); close(client); close(fd); _exit(0);
+    }
+    char url[256]; snprintf(url,sizeof(url),"http://127.0.0.1:%u/receive?q={{message}}",(unsigned)ntohs(addr.sin_port));
+    J *c=cJSON_CreateObject(),*s=cJSON_CreateObject();
+    cJSON_AddStringToObject(c,"method",method); cJSON_AddStringToObject(c,"body",body);
+    cJSON_AddStringToObject(s,"url",url); cJSON_AddStringToObject(s,"headers","X-Test: value\nContent-Type: application/json");
+    int retry=0; char error[128]={0};
+    assert(push_deliver("webhook",c,s,message,&retry,error,sizeof(error))==expected);
+    int result=0; assert(waitpid(child,&result,0)==child && WIFEXITED(result) && WEXITSTATUS(result)==0);
+    close(fd); cJSON_Delete(c); delete_secret_json(s);
 }
 int main(void) {
     assert(sodium_init()>=0);
@@ -55,5 +90,20 @@ int main(void) {
     helper_exit=75; assert(push_deliver("smtp",config,secrets,"retry guard",&delay,error,sizeof(error))==1);
     helper_available=0; assert(push_deliver("smtp",config,secrets,"missing helper",&delay,error,sizeof(error))==0);
     unlink(temporary); cJSON_Delete(config); delete_secret_json(secrets);
+    config=cJSON_Parse("{\"method\":\"POST\",\"body\":\"{{message_json}}\"}");
+    secrets=cJSON_Parse("{\"url\":\"http://127.0.0.1:8000/?text={{message}}\",\"headers\":\"X-Test: yes\\nBad Header: nope\"}");
+    assert(!push_validate("webhook",config,secrets));
+    cJSON_ReplaceItemInObjectCaseSensitive(secrets,"headers",cJSON_CreateString("X-Test: yes\rInjected: nope"));
+    assert(!push_validate("webhook",config,secrets));
+    cJSON_ReplaceItemInObjectCaseSensitive(secrets,"headers",cJSON_CreateString(""));
+    assert(push_validate("webhook",config,secrets));
+    cJSON_ReplaceItemInObjectCaseSensitive(secrets,"url",cJSON_CreateString("file:///etc/passwd"));
+    assert(!push_validate("webhook",config,secrets));
+    cJSON_Delete(config); delete_secret_json(secrets);
+    check_webhook("GET","ignored","/receive?q=a%22b%0A","","a\"b\n",204,3);
+    check_webhook("GET","","/receive?q=%E4%BD%A0%E5%A5%BD","","你好",200,3);
+    check_webhook("POST","{\"text\":{{message_json}}}","/receive?q=a%22b%0A","{\"text\":\"a\\\"b\\n\"}","a\"b\n",200,3);
+    check_webhook("PUT","value={{message}}","/receive?q=a%22b%0A","value=a\"b\n","a\"b\n",500,1);
+    check_webhook("POST","{{message}}","/receive?q=a%22b%0A","a\"b\n","a\"b\n",400,2);
     puts("Push encoding, signing and validation tests passed"); return 0;
 }

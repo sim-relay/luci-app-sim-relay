@@ -17,9 +17,15 @@ touch "$suite/.sim-relay-managed"
 cp /src/CMakeLists.txt /src/LICENSE "$suite/"
 cp -R /src/src "$suite/src"
 cp -R /src/package/sim-relay "$suite/package/sim-relay"
-cp -R /src/package/sim-relay-smtp "$suite/package/sim-relay-smtp"
 cp -R /src/package/sim-relay-modemmanager "$suite/package/sim-relay-modemmanager"
 cp -R /src/luci-app-sim-relay "$suite/luci-app-sim-relay"
+
+# Without git metadata luci.mk derives package versions from file mtimes.
+# A tag build uses one commit timestamp for every matrix job and rerun.
+if [[ -n ${SIM_RELAY_RELEASE_EPOCH:-} ]]; then
+    [[ $SIM_RELAY_RELEASE_EPOCH =~ ^[0-9]+$ ]] || { echo 'Invalid release timestamp' >&2; exit 2; }
+    find "$suite/luci-app-sim-relay" -type f -exec touch -d "@$SIM_RELAY_RELEASE_EPOCH" '{}' +
+fi
 
 # Keep the release SDK's feed URLs/commit pins; never substitute a moving branch.
 ./scripts/feeds update -a
@@ -32,14 +38,10 @@ cat >> .config <<'CONFIG'
 # CONFIG_ALL_KMODS is not set
 CONFIG_PACKAGE_sim-relay=m
 CONFIG_PACKAGE_luci-app-sim-relay=m
-# CONFIG_PACKAGE_sim-relay-smtp is not set
 # CONFIG_PACKAGE_sim-relay-modemmanager is not set
 # CONFIG_PACKAGE_luci-i18n-sim-relay-zh-cn is not set
 # CONFIG_LUCI_LANG_zh_Hans is not set
 CONFIG
-if [[ ${WITH_SMTP:-0} == 1 ]]; then
-    printf '\nCONFIG_PACKAGE_sim-relay-smtp=m\n' >> .config
-fi
 if [[ ${WITH_MM_PIN:-0} == 1 ]]; then
     printf '\nCONFIG_PACKAGE_sim-relay-modemmanager=m\n' >> .config
 fi
@@ -51,6 +53,7 @@ fi
 make defconfig
 packages=(sim-relay luci-app-sim-relay)
 if [[ ${WITH_ZH_CN:-1} == 1 ]]; then packages+=(luci-i18n-sim-relay-zh-cn); fi
+if [[ ${WITH_MM_PIN:-0} == 1 ]]; then packages+=(sim-relay-modemmanager); fi
 for name in "${packages[@]}"; do
     if ! grep -Eq "^CONFIG_PACKAGE_${name}=[my]$" .config; then
         printf 'ERROR: Package %s was not selected after make defconfig\n' "$name" >&2
@@ -64,10 +67,6 @@ mkdir -p bin
 find bin -type f \( -name 'sim-relay_*.ipk' -o -name 'luci-app-sim-relay_*.ipk' -o -name 'sim-relay-smtp_*.ipk' -o -name 'sim-relay-modemmanager_*.ipk' -o -name 'luci-i18n-sim-relay-*_*.ipk' \) -delete
 make -j"$jobs" package/sim-relay-suite/package/sim-relay/compile V=s
 make -j"$jobs" package/sim-relay-suite/luci-app-sim-relay/compile V=s
-if [[ ${WITH_SMTP:-0} == 1 ]]; then
-    make -j"$jobs" package/sim-relay-suite/package/sim-relay-smtp/compile V=s
-fi
-
 if [[ ${WITH_MM_PIN:-0} == 1 ]]; then
     make -j"$jobs" package/sim-relay-suite/package/sim-relay-modemmanager/compile V=s
 fi

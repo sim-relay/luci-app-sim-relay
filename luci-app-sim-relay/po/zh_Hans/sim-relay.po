@@ -361,7 +361,7 @@ msgstr "SIM / PIN"
 
 #: root/usr/share/luci/menu.d/luci-app-sim-relay.json
 msgid "SIM Relay"
-msgstr "SIM Relay"
+msgstr "短信中继"
 
 #: htdocs/luci-static/resources/view/sim-relay/push-channels.js
 msgid "SIM SMS"
@@ -382,10 +382,6 @@ msgstr "SMTP 邮件"
 #: htdocs/luci-static/resources/view/sim-relay/push-channels.js
 msgid "SMTP host"
 msgstr "SMTP 主机"
-
-#: htdocs/luci-static/resources/view/sim-relay/push-channels.js
-msgid "SMTP requires the optional sim-relay-smtp package, which provides a separate mail client with TLS support."
-msgstr "SMTP 需要安装可选的 sim-relay-smtp 包；该包包含独立的邮件 TLS 客户端。"
 
 #: htdocs/luci-static/resources/view/sim-relay/push-channels.js htdocs/luci-static/resources/view/sim-relay/overview.js
 msgid "Save"
@@ -885,7 +881,7 @@ msgstr "推送配置无效"
 
 #: ../src
 msgid "smtp_helper_missing"
-msgstr "未安装 SMTP 辅助客户端，请安装 sim-relay-smtp"
+msgstr "未找到 SMTP 客户端，请检查 msmtp 是否已安装"
 
 #: ../src
 msgid "smtp_message_too_large"
@@ -950,3 +946,176 @@ msgstr "部分设备数据无法删除"
 #: ../src/lite.c
 msgid "This ZTE device address has already been added."
 msgstr "该中兴设备地址已添加。"
+
+#: htdocs/luci-static/resources/view/sim-relay/overview.js htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "Device"
+msgstr "设备"
+
+#: htdocs/luci-static/resources/view/sim-relay/overview.js
+msgid "Devices"
+msgstr "设备"
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js
+msgid "No channels have been added."
+msgstr "尚未添加推送通道。"
+
+#: htdocs/luci-static/resources/view/sim-relay/push-channels.js
+msgid "No forwards yet."
+msgstr "暂无转发记录。"
+
+#: htdocs/luci-static/resources/view/sim-relay/overview.js htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "No messages found."
+msgstr "没有找到短信。"
+
+#: htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "No operations yet."
+msgstr "暂无操作记录。"
+
+#: htdocs/luci-static/resources/view/sim-relay/overview.js
+msgid "No recent sends."
+msgstr "暂无发送记录。"
+
+#: htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "0 = keep all messages"
+msgstr "0 表示不自动删除"
+
+#: htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "Automatic cleanup keeps the newest N messages and removes older ones."
+msgstr "自动清理会保留最新的 N 条短信并删除更早的短信。"
+
+#: root/usr/share/luci/menu.d/luci-app-sim-relay.json htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "Devices and SIM"
+msgstr "设备与 SIM"
+
+#: htdocs/luci-static/resources/view/sim-relay/overview.js htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "Keep recent messages"
+msgstr "保留最近短信"
+
+#: htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "SIM"
+msgstr "SIM 卡"
+
+#: htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "Set PIN"
+msgstr "设置 PIN"
+
+#: htdocs/luci-static/resources/view/sim-relay/overview.js
+msgid "Browse, send and delete SMS on the selected device."
+msgstr "在所选设备上浏览、发送和删除短信。"
+
+#: htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "PIN (4-8 digits)"
+msgstr "PIN（4-8 位数字）"
+
+#: htdocs/luci-static/resources/view/sim-relay/manage-pin.js
+msgid "PIN attempts"
+msgstr "PIN 剩余次数"
+
+
+msgid "Request method"
+msgstr "请求方法"
+
+
+msgid "Request headers"
+msgstr "请求头"
+
+
+msgid "Request body"
+msgstr "请求体"
+
+
+msgid "Use {{message}} in the URL for URL-encoded message text."
+msgstr "在 URL 中使用 {{message}} 插入经过 URL 编码的消息内容。"
+
+
+msgid "Enter one header per line, for example Content-Type: application/json."
+msgstr "每行输入一个请求头，例如 Content-Type: application/json。"
+
+
+msgid "Clear saved request headers"
+msgstr "清除已保存的请求头"
+
+
+msgid "Use {{message}} for plain text, or {{message_json}} for a JSON string including quotes."
+msgstr "使用 {{message}} 插入普通文本，或使用 {{message_json}} 插入包含引号的 JSON 字符串。"
+
+
+msgid "webhook_template_too_large"
+msgstr "Webhook 地址或请求体展开后过长"
+
+
+msgid "webhook_delivery_rejected"
+msgstr "Webhook 请求被拒绝"
+
+
+msgid "webhook_delivery_unconfirmed"
+msgstr "Webhook 发送结果未确认"
+
+msgid "Operation interrupted after submission; do not retry automatically"
+msgstr "操作提交后中断，结果未确认，不会自动重试"
+
+msgid "Runtime state unreadable; retained for inspection"
+msgstr "无法读取运行状态，已保留原文件供检查"
+
+msgid "Runtime snapshot too large; progress not advanced"
+msgstr "运行状态快照过大，未推进转发进度"
+
+msgid "Cannot save operation result; task retained"
+msgstr "无法保存操作结果，已保留任务"
+
+msgid "Cannot allocate forward message"
+msgstr "无法为转发消息分配内存"
+
+msgid "Invalid pending file; retained for inspection"
+msgstr "待转发文件无效，已保留供检查"
+
+msgid "Remote API"
+msgstr "远程 API"
+
+msgid "Local network only"
+msgstr "仅局域网"
+
+msgid "All networks"
+msgstr "所有网络"
+
+msgid "HTTPS (router certificate)"
+msgstr "HTTPS（使用路由器证书）"
+
+msgid "Leave blank to keep the current token"
+msgstr "留空以保留现有令牌"
+
+msgid "Generate token"
+msgstr "生成令牌"
+
+msgid "API settings saved. Copy the token before leaving this page."
+msgstr "API 设置已保存，请在离开页面前复制令牌。"
+
+msgid "Enable remote API"
+msgstr "启用远程 API"
+
+msgid "Access scope"
+msgstr "访问范围"
+
+msgid "All networks listens on all interfaces; firewall rules still control external access."
+msgstr "所有网络会监听全部接口，外网访问仍受防火墙规则控制。"
+
+msgid "Transport"
+msgstr "传输方式"
+
+msgid "HTTPS uses the router uhttpd certificate and SSL provider. HTTP sends the token without encryption."
+msgstr "HTTPS 使用路由器的 uhttpd 证书及 SSL 组件；HTTP 会明文传输令牌。"
+
+msgid "API token"
+msgstr "API 令牌"
+
+msgid "The token is shown only here. Copy it before leaving; a new token replaces the old one."
+msgstr "令牌仅在此处显示，请在离开前复制；新令牌会替换旧令牌。"
+
+msgid "API requests use a Bearer token. See the project API documentation for endpoints and examples."
+msgstr "API 请求使用 Bearer 令牌，接口和示例见项目 API 文档。"
+
+msgid "Invalid API settings"
+msgstr "API 设置无效"
+
+msgid "Generate an API token before enabling the service"
+msgstr "启用服务前请先生成 API 令牌"

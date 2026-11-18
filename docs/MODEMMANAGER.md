@@ -1,5 +1,7 @@
 # 本机蜂窝模块（ModemManager）
 
+[English](USAGE.md#devices-and-sim) | 简体中文
+
 SIM Relay 通过系统 ModemManager 使用本机蜂窝模块，不负责驱动、APN 或拨号配置。后台通过 `mmcli` 发现并管理模块，不链接 libmm-glib；主包和 LuCI 包均不强制依赖 `modemmanager`。
 
 ## 安装与添加

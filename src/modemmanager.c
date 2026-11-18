@@ -167,10 +167,13 @@ J *mm_snapshot(J *device,double deadline,char *error,size_t size) {
     }
     J *raw=command("-m",str(sim,"modem"),"--messaging-list-sms",NULL,deadline,error,size),*paths=field(raw,"modem.messaging.sms"),*p;
     if (!cJSON_IsArray(paths) || cJSON_GetArraySize(paths)>4096) { cJSON_Delete(raw); cJSON_Delete(sim); snprintf(error,size,"Invalid SMS list"); return NULL; }
-    J *messages=cJSON_AddArrayToObject(sim,"messages");
+    J *messages=cJSON_AddArrayToObject(sim,"messages"); size_t text_bytes=0;
     cJSON_ArrayForEach(p,paths) {
         J *m=cJSON_IsString(p)?read_sms(p->valuestring,deadline,error,size):NULL;
         if (!m) { cJSON_Delete(raw); cJSON_Delete(sim); return NULL; }
+        size_t n=strlen(str(m,"text"));
+        if (n>1024U*1024U-text_bytes) { cJSON_Delete(m); cJSON_Delete(raw); cJSON_Delete(sim); snprintf(error,size,"SMS snapshot exceeds memory budget; snapshot discarded"); return NULL; }
+        text_bytes+=n;
         /* Only complete received messages may enter the forwarding cursor. */
         if (!strcmp(str(m,"state"),"receiving")) { cJSON_Delete(m); cJSON_Delete(raw); cJSON_Delete(sim); snprintf(error,size,"Waiting for a complete multipart SMS"); return NULL; }
         cJSON_AddItemToArray(messages,m);

@@ -93,9 +93,77 @@ static int send_mail(J *c, J *s, const char *text, char *error, size_t size) {
     if (sent==(size_t)length && finished && WIFEXITED(status) && WEXITSTATUS(status)==0) return 3;
     snprintf(error,size,"smtp_result_unconfirmed"); return 1;
 }
+/* Substitute once, so message text containing a placeholder is not expanded again. */
+static char *webhook_expand(const char *source, const char *message, const char *json, size_t limit) {
+    size_t total=0;
+    for (const char *p=source;*p;) {
+        const char *value=NULL; size_t skip=0;
+        if (json && !strncmp(p,"{{message_json}}",16)) { value=json; skip=16; }
+        else if (!strncmp(p,"{{message}}",11)) { value=message; skip=11; }
+        size_t n=value?strlen(value):1;
+        if (n>limit-total) return NULL;
+        total+=n; p+=value?skip:1;
+    }
+    char *out=malloc(total+1); if (!out) return NULL;
+    size_t used=0;
+    while (*source) {
+        const char *value=NULL; size_t skip=0;
+        if (json && !strncmp(source,"{{message_json}}",16)) { value=json; skip=16; }
+        else if (!strncmp(source,"{{message}}",11)) { value=message; skip=11; }
+        size_t n=value?strlen(value):1;
+        memcpy(out+used,value?value:source,n); used+=n; source+=value?skip:1;
+    }
+    out[used]=0; return out;
+}
+static int send_webhook(J *c, J *s, const char *text, char *error, size_t size) {
+    CURL *curl=curl_easy_init(); if (!curl) return 0;
+    char *escaped=curl_easy_escape(curl,text,0),*url=NULL,*body=NULL,*json_text=NULL;
+    int is_get=!strcmp(str(c,"method"),"GET");
+    J *json=is_get?NULL:cJSON_CreateString(text);
+    if (json) json_text=cJSON_PrintUnformatted(json);
+    cJSON_Delete(json);
+    if (escaped) url=webhook_expand(str(s,"url"),escaped,NULL,16384);
+    if (is_get) body=strdup("");
+    else if (json_text) body=webhook_expand(str(c,"body"),text,json_text,65536);
+    curl_free(escaped); wipe_secret(json_text);
+    if (!url || !body) { wipe_secret(url); wipe_secret(body); curl_easy_cleanup(curl); snprintf(error,size,"webhook_template_too_large"); return 0; }
+    struct curl_slist *headers=NULL; const char *line=str(s,"headers"); int headers_ok=1;
+    while (*line) {
+        const char *end=strchr(line,'\n'); if (!end) end=line+strlen(line);
+        size_t n=(size_t)(end-line); if (n && line[n-1]=='\r') n--;
+        if (n) {
+            char *value=strndup(line,n); struct curl_slist *next=value?curl_slist_append(headers,value):NULL;
+            wipe_secret(value); if (!next) { headers_ok=0; break; } headers=next;
+        }
+        line=*end?end+1:end;
+    }
+    Response response={0}; CURLcode rc=CURLE_FAILED_INIT; long http=0;
+    if (headers_ok) {
+        curl_easy_setopt(curl,CURLOPT_URL,url);
+        curl_easy_setopt(curl,CURLOPT_HTTPHEADER,headers);
+        curl_easy_setopt(curl,CURLOPT_PROXY,"");
+        curl_easy_setopt(curl,CURLOPT_FOLLOWLOCATION,0L);
+        curl_easy_setopt(curl,CURLOPT_NOSIGNAL,1L);
+        curl_easy_setopt(curl,CURLOPT_TIMEOUT,20L);
+        curl_easy_setopt(curl,CURLOPT_CONNECTTIMEOUT,5L);
+        curl_easy_setopt(curl,CURLOPT_WRITEFUNCTION,receive);
+        curl_easy_setopt(curl,CURLOPT_WRITEDATA,&response);
+        if (!is_get) {
+            curl_easy_setopt(curl,CURLOPT_POSTFIELDS,body);
+            if (!strcmp(str(c,"method"),"PUT")) curl_easy_setopt(curl,CURLOPT_CUSTOMREQUEST,"PUT");
+        }
+        rc=curl_easy_perform(curl); curl_easy_getinfo(curl,CURLINFO_RESPONSE_CODE,&http);
+    }
+    for (struct curl_slist *h=headers;h;h=h->next) if (h->data) erase_memory(h->data,strlen(h->data));
+    curl_slist_free_all(headers); curl_easy_cleanup(curl); wipe_secret(url); wipe_secret(body); free(response.data);
+    if (rc==CURLE_OK && http>=200 && http<300) return 3;
+    int outcome=rc==CURLE_OK && http>=400 && http<500 && http!=408 && http!=429?2:1;
+    snprintf(error,size,"webhook_delivery_%s",outcome==2?"rejected":"unconfirmed"); return outcome;
+}
 int push_deliver(const char *kind, J *c, J *s, const char *text, int *retry_after, char *error, size_t size) {
     if (!push_validate(kind,c,s)) { snprintf(error,size,"invalid_push_configuration"); return 0; }
     if (!strcmp(kind,"smtp")) return send_mail(c,s,text,error,size);
+    if (!strcmp(kind,"webhook")) return send_webhook(c,s,text,error,size);
     char url[2300]; J *body=cJSON_CreateObject();
     if (!strcmp(kind,"telegram")) {
         if (strlen(text)>4096) { cJSON_Delete(body); snprintf(error,size,"telegram_text_too_long"); return 0; }

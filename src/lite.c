@@ -11,10 +11,17 @@
 #include <sys/wait.h>
 #include <dirent.h>
 #include <time.h>
+#include <poll.h>
+#include <signal.h>
+#include <sodium.h>
 #ifndef RELAY_UCI
 #define RELAY_UCI "/sbin/uci"
 #endif
 #define MAX_FILE (4*1024*1024)
+#define PRUNE_BATCH 20
+#define ACTIONS_PER_TICK 1
+#define FORWARDS_PER_TICK 4
+#define PENDING_SCANS_PER_TICK 128
 const char *str(J *j,const char *key) { J *v=cJSON_GetObjectItemCaseSensitive(j,key); return cJSON_IsString(v)?v->valuestring:""; }
 int integer(J *j,const char *key,int fallback) { J *v=cJSON_GetObjectItemCaseSensitive(j,key); return cJSON_IsNumber(v)?v->valueint:fallback; }
 J *failure(const char *message) { J *j=cJSON_CreateObject(); cJSON_AddStringToObject(j,"error",message); return j; }
@@ -48,7 +55,9 @@ static J *read_json(const char *path) {
 static int atomic_json(const char *path,J *j,int durable) {
     char tmp[4096]; int n=snprintf(tmp,sizeof(tmp),"%s.XXXXXX",path); if (n<0 || n>=(int)sizeof(tmp)) return 0;
     char *raw=cJSON_PrintUnformatted(j); if (!raw) return 0;
-    int fd=mkstemp(tmp),success=fd>=0; size_t len=strlen(raw),offset=0;
+    size_t len=strlen(raw),offset=0;
+    if (len>MAX_FILE) { erase_memory(raw,len); free(raw); return 0; }
+    int fd=mkstemp(tmp),success=fd>=0;
     while (success && offset<len) { ssize_t wrote=write(fd,raw+offset,len-offset); if (wrote<=0) success=0; else offset+=(size_t)wrote; }
     if (success && durable && fsync(fd)<0) success=0;
     if (fd>=0 && close(fd)<0) success=0;
@@ -66,6 +75,7 @@ static char *uci(const char *command,const char *argument,int *success) {
     int fds[2]; *success=0; if (pipe(fds)<0) return NULL;
     pid_t pid=fork(); if (pid<0) { close(fds[0]); close(fds[1]); return NULL; }
     if (!pid) {
+        setpgid(0,0);
         close(fds[0]); dup2(fds[1],STDOUT_FILENO); close(fds[1]);
         int null=open("/dev/null",O_RDWR); if (null>=0) { dup2(null,STDERR_FILENO); dup2(null,STDIN_FILENO); close(null); }
         const char *executable=RELAY_UCI;
@@ -74,10 +84,38 @@ static char *uci(const char *command,const char *argument,int *success) {
 #endif
         execl(executable,"uci","-q",command,argument,(char *)NULL); _exit(127);
     }
-    close(fds[1]); char *raw=calloc(65537,1); size_t n=0; char buf[4096]; ssize_t got;
-    while ((got=read(fds[0],buf,sizeof(buf)))>0) if (raw && n+(size_t)got<=65536) { memcpy(raw+n,buf,(size_t)got); n+=(size_t)got; } else { free(raw); raw=NULL; }
-    close(fds[0]); int status=0; while (waitpid(pid,&status,0)<0 && errno==EINTR) {}
-    *success=WIFEXITED(status) && WEXITSTATUS(status)==0 && raw; return raw;
+    setpgid(pid,pid); close(fds[1]);
+    if (fcntl(fds[0],F_SETFL,O_NONBLOCK)<0) { close(fds[0]); kill(-pid,SIGKILL); kill(pid,SIGKILL); while (waitpid(pid,NULL,0)<0 && errno==EINTR) {} return NULL; }
+    char *raw=calloc(65537,1); size_t n=0; int status=0,finished=0,eof=0,valid=raw!=NULL;
+    double timeout=5.0;
+#ifdef RELAY_TESTING
+    const char *test_timeout=getenv("SIM_RELAY_TEST_UCI_TIMEOUT_MS");
+    if (test_timeout && atoi(test_timeout)>0 && atoi(test_timeout)<=5000) timeout=atoi(test_timeout)/1000.0;
+#endif
+    double deadline=relay_monotonic()+timeout;
+    while (valid && (!finished || !eof) && relay_monotonic()<deadline) {
+        char buf[4096]; ssize_t got;
+        while ((got=read(fds[0],buf,sizeof(buf)))>0) {
+            if ((size_t)got>65536-n) { valid=0; break; }
+            memcpy(raw+n,buf,(size_t)got); n+=(size_t)got;
+        }
+        if (got==0) eof=1;
+        else if (got<0 && errno!=EAGAIN && errno!=EWOULDBLOCK && errno!=EINTR) valid=0;
+        if (!finished) {
+            pid_t result=waitpid(pid,&status,WNOHANG);
+            if (result==pid) finished=1;
+            else if (result<0 && errno!=EINTR) valid=0;
+        }
+        if (valid && (!finished || !eof)) {
+            struct pollfd p={fds[0],POLLIN,0};
+            if (eof) poll(NULL,0,20); else poll(&p,1,20);
+        }
+    }
+    close(fds[0]);
+    if (!finished || !eof) { kill(-pid,SIGKILL); kill(pid,SIGKILL); if (!finished) while (waitpid(pid,&status,0)<0 && errno==EINTR) {} valid=0; }
+    *success=valid && finished && WIFEXITED(status) && WEXITSTATUS(status)==0;
+    if (!*success) { free(raw); return NULL; }
+    return raw;
 }
 static int save_config(Relay *r) {
     const char *local=getenv("SIM_RELAY_CONFIG");
@@ -96,7 +134,14 @@ int open_store(Relay *r,const char *path) {
     if (!path_join(p,path,"pending") || !directory(p,1)) goto fail;
     if (!path_join(p,r->runtime,"actions") || !directory(p,1)) goto fail;
     if (!path_join(p,r->runtime,"config.lock")) goto fail;
-    r->lock=open(p,O_CREAT|O_RDWR|O_NOFOLLOW|O_CLOEXEC,0600); if (r->lock<0 || flock(r->lock,LOCK_EX)<0) goto fail;
+    r->lock=open(p,O_CREAT|O_RDWR|O_NOFOLLOW|O_CLOEXEC,0600); if (r->lock<0) goto fail;
+    double deadline=relay_monotonic()+5.0; int locked=0;
+    while (relay_monotonic()<deadline) {
+        if (flock(r->lock,LOCK_EX|LOCK_NB)==0) { locked=1; break; }
+        if (errno!=EWOULDBLOCK && errno!=EAGAIN && errno!=EINTR) break;
+        struct timespec delay={0,20000000}; nanosleep(&delay,NULL);
+    }
+    if (!locked) goto fail;
     const char *local=getenv("SIM_RELAY_CONFIG");
     if (local && *local) {
         r->config=read_json(local); if (!r->config && access(local,F_OK)==0) goto fail;
@@ -114,14 +159,40 @@ fail:
     snprintf(r->error,sizeof(r->error),"Cannot open private state directory or configuration (UCI main.data must exist)"); return 0;
 }
 void close_store(Relay *r) { if (r->lock>=0) close(r->lock); r->lock=-1; delete_secret_json(r->config); r->config=NULL; }
-static J *runtime(Relay *r) { char p[4096]; path_join(p,r->runtime,"state.json"); J *s=read_json(p); return s?s:cJSON_CreateObject(); }
-void reset_runtime(Relay *r) { char p[4096]; path_join(p,r->runtime,"state.json"); unlink(p); }
+static J *runtime(Relay *r) {
+    char p[4096]; if (!path_join(p,r->runtime,"state.json")) return NULL;
+    J *s=read_json(p); if (cJSON_IsObject(s)) return s; cJSON_Delete(s);
+    struct stat st; if (lstat(p,&st)<0 && errno==ENOENT) return cJSON_CreateObject();
+    snprintf(r->error,sizeof(r->error),"Runtime state unreadable; retained for inspection"); return NULL;
+}
+void reset_runtime(Relay *r) {
+    char p[4096]; if (!path_join(p,r->runtime,"state.json")) return;
+    J *state=runtime(r); if (state) { cJSON_Delete(state); unlink(p); }
+}
 static J *state_device(J *state,int id) { J *list=array(state,"devices"),*d=find(list,id); if (!d) { d=cJSON_CreateObject(); number(d,"id",id); cJSON_AddItemToArray(list,d); } return d; }
 static J *pin_for(Relay *r,const char *iccid) { J *p; cJSON_ArrayForEach(p,array(r->config,"pins")) if (!strcmp(str(p,"iccid"),iccid)) return p; return NULL; }
-static int commit(void *ctx) { (void)ctx; return 1; }
 static void history(J *state,const char *key,J *job) { J *a=array(state,key); cJSON_AddItemToArray(a,cJSON_Duplicate(job,1)); while (cJSON_GetArraySize(a)>50) cJSON_DeleteItemFromArray(a,0); }
 static int pending_path(Relay *r,const char *name,char p[4096]) { char dir[4096]; return path_join(dir,r->path,"pending") && path_join(p,dir,name); }
 static int json_name(const char *name) { size_t n=strlen(name); return n>5 && !strcmp(name+n-5,".json"); }
+/* Called while holding the configuration lock; shared by all CGI processes. */
+int api_reserve_send(Relay *r) {
+    char dirpath[4096],path[4096];
+    if (!path_join(dirpath,r->runtime,"actions") || !path_join(path,r->runtime,"api-rate.json")) return 0;
+    DIR *dir=opendir(dirpath); if (!dir) return 0;
+    struct dirent *entry; int count=0;
+    while ((entry=readdir(dir))) if (json_name(entry->d_name)) count++;
+    closedir(dir); if (count>=64) return 0;
+    J *rate=read_json(path);
+    if (!rate) {
+        struct stat st; if (lstat(path,&st)==0 || errno!=ENOENT) return 0;
+        rate=cJSON_CreateObject(); if (!rate) return 0;
+    }
+    time_t now=time(NULL); int window=integer(rate,"window",0),used=integer(rate,"count",0);
+    if (now<window || now-window>=60) { window=(int)now; used=0; }
+    int ok=0;
+    if (used>=0 && used<30) { number(rate,"window",window); number(rate,"count",used+1); ok=atomic_json(path,rate,0); }
+    cJSON_Delete(rate); return ok;
+}
 static J *pending_list(Relay *r,int device) {
     J *out=cJSON_CreateArray(); char p[4096]; pending_path(r,"",p); DIR *dir=opendir(p); struct dirent *e;
     if (!dir) return out;
@@ -152,50 +223,145 @@ static int enqueue_forward(Relay *r,J *d,J *m,J *targets,const char *iccid) {
 static int contains(J *list,const char *key) { J *v; cJSON_ArrayForEach(v,list) if (!strcmp(str(v,"external_id"),key)) return 1; return 0; }
 static int bound(J *d,int id) { J *n; cJSON_ArrayForEach(n,cJSON_GetObjectItemCaseSensitive(d,"channels")) if (cJSON_IsNumber(n) && n->valueint==id) return 1; return 0; }
 static int bound_version(J *list,int id,int version) { J *v=find(list,id); return v && integer(v,"version",0)==version; }
+typedef struct {
+    Relay *relay;
+    J *device, *job, *pin;
+    const char *path;
+    int channel_id, channel_version, retention;
+} CommitContext;
+static int same_device(J *before,J *now) {
+    return before && now && integer(now,"enabled",1) &&
+        !strcmp(str(before,"adapter"),str(now,"adapter")) &&
+        !strcmp(str(before,"base_url"),str(now,"base_url")) &&
+        !strcmp(str(before,"hardware_id"),str(now,"hardware_id"));
+}
+/* Serialize the final authorization and action checkpoint with config edits. */
+static int commit(void *opaque) {
+    CommitContext *ctx=opaque; Relay current={.lock=-1}; int ok=0;
+    if (!ctx || !open_store(&current,ctx->relay->path)) { close_store(&current); return 0; }
+    J *d=find(array(current.config,"devices"),integer(ctx->device,"id",0));
+    if (!same_device(ctx->device,d)) goto end;
+    if (ctx->retention && integer(d,"keep_messages",0)!=integer(ctx->device,"keep_messages",0)) goto end;
+    if (ctx->channel_id) {
+        J *c=find(array(current.config,"channels"),ctx->channel_id);
+        if (!c || !integer(c,"enabled",1) || integer(c,"version",0)!=ctx->channel_version || !bound(d,ctx->channel_id)) goto end;
+    }
+    if (ctx->path) {
+        J *saved=read_json(ctx->path);
+        int matches=saved && (ctx->job ? !strcmp(str(saved,"request"),str(ctx->job,"request")) : 1);
+        cJSON_Delete(saved); if (!matches) goto end;
+    }
+    if (ctx->pin) {
+        J *pin=pin_for(&current,str(ctx->pin,"iccid"));
+        if (!pin || !integer(pin,"auto_enabled",0) || integer(pin,"auto_attempted",0) ||
+            strcmp(str(pin,"ciphertext"),str(ctx->pin,"ciphertext"))) goto end;
+        number(pin,"auto_attempted",1);
+        if (!save_config(&current)) goto end;
+    }
+    if (ctx->job) {
+        text(ctx->job,"status","attempting");
+        if (!atomic_json(ctx->path,ctx->job,0)) goto end;
+    }
+    ok=1;
+end:
+    close_store(&current); return ok;
+}
+static void clear_auto_attempt(Relay *r,J *device,J *pin) {
+    Relay current={.lock=-1};
+    if (!open_store(&current,r->path)) { close_store(&current); return; }
+    J *d=find(array(current.config,"devices"),integer(device,"id",0));
+    J *saved=pin_for(&current,str(pin,"iccid"));
+    if (same_device(device,d) && saved && integer(saved,"auto_attempted",0) &&
+        !strcmp(str(saved,"ciphertext"),str(pin,"ciphertext"))) {
+        number(saved,"auto_attempted",0); save_config(&current);
+    }
+    close_store(&current);
+}
 static J *channel_secrets(Relay *r,J *c) {
     if (!*str(c,"ciphertext")) return cJSON_CreateObject();
     char context[40]; snprintf(context,sizeof(context),"channel-%d",integer(c,"id",0));
     char *raw=open_secret(r,context,str(c,"ciphertext")); J *out=raw?cJSON_Parse(raw):NULL; wipe_secret(raw); return out;
 }
+static int checkpoint_pending(Relay *r,const char *path,J *job) {
+    Relay current={.lock=-1}; int ok=0;
+    if (!open_store(&current,r->path)) { close_store(&current); return 0; }
+    J *saved=read_json(path);
+    if (!saved && access(path,F_OK)!=0 && errno==ENOENT) ok=1; /* Deleted by the user. */
+    else if (saved && !strcmp(str(saved,"key"),str(job,"key"))) {
+        J *targets=cJSON_GetObjectItemCaseSensitive(job,"targets");
+        ok=cJSON_GetArraySize(targets)?atomic_json(path,job,1):(unlink(path)==0 || errno==ENOENT);
+    }
+    cJSON_Delete(saved); close_store(&current); return ok;
+}
+static int next_pending_name(DIR *dir,const char *after,char name[256]) {
+    struct dirent *entry; name[0]=0; rewinddir(dir);
+    while ((entry=readdir(dir))) {
+        if (!json_name(entry->d_name) || strlen(entry->d_name)>=256 || strcmp(entry->d_name,after)<=0) continue;
+        if (!*name || strcmp(entry->d_name,name)<0) snprintf(name,256,"%s",entry->d_name);
+    }
+    return *name!=0;
+}
 static void process_pending(Relay *r,J *state) {
     char dirpath[4096],p[4096]; pending_path(r,"",dirpath); DIR *dir=opendir(dirpath); if (!dir) return;
-    struct dirent *e;
-    while ((e=readdir(dir))) if (json_name(e->d_name)) {
-        pending_path(r,e->d_name,p); J *job=read_json(p); if (!job) { text(state,"error","Unreadable pending file; retained for inspection"); continue; }
-        int id=integer(job,"device_id",0); J *d=find(array(r->config,"devices"),id),*targets=array(job,"targets");
-        if (!d) { unlink(p); cJSON_Delete(job); continue; }
-        if (!integer(d,"enabled",1)) { cJSON_Delete(job); continue; }
-        for (int i=cJSON_GetArraySize(targets)-1;i>=0;i--) {
-            J *t=cJSON_GetArrayItem(targets,i),*c=find(array(r->config,"channels"),integer(t,"id",0));
+    static char cursor[256]; char initial[256],name[256];
+    snprintf(initial,sizeof(initial),"%s",cursor); int processed=0,scanned=0,wrapped=0;
+    while (processed<FORWARDS_PER_TICK && scanned<PENDING_SCANS_PER_TICK) {
+        if (!next_pending_name(dir,cursor,name)) {
+            if (wrapped || !*initial) { cursor[0]=0; break; }
+            cursor[0]=0; wrapped=1; continue;
+        }
+        if (wrapped && strcmp(name,initial)>=0) break;
+        snprintf(cursor,sizeof(cursor),"%s",name); scanned++;
+        pending_path(r,name,p); J *job=read_json(p); if (!job) { text(state,"error","Unreadable pending file; retained for inspection"); continue; }
+        J *targets=cJSON_GetObjectItemCaseSensitive(job,"targets");
+        if (!cJSON_IsArray(targets)) { text(state,"error","Invalid pending file; retained for inspection"); cJSON_Delete(job); continue; }
+        if (!cJSON_GetArraySize(targets)) { checkpoint_pending(r,p,job); cJSON_Delete(job); continue; }
+        Relay fresh={.lock=-1};
+        if (!open_store(&fresh,r->path)) { close_store(&fresh); cJSON_Delete(job); break; }
+        if (fresh.lock>=0) { close(fresh.lock); fresh.lock=-1; }
+        int id=integer(job,"device_id",0); J *d=find(array(fresh.config,"devices"),id);
+        if (!d) {
+            /* Recheck under the lock before removing an orphan. */
+            Relay current={.lock=-1};
+            if (open_store(&current,r->path) && !find(array(current.config,"devices"),id)) unlink(p);
+            close_store(&current); close_store(&fresh); cJSON_Delete(job); continue;
+        }
+        if (!integer(d,"enabled",1)) { close_store(&fresh); cJSON_Delete(job); continue; }
+        for (int i=cJSON_GetArraySize(targets)-1;i>=0 && processed<FORWARDS_PER_TICK;i--) {
+            J *t=cJSON_GetArrayItem(targets,i),*c=find(array(fresh.config,"channels"),integer(t,"id",0));
             if (!c || !integer(c,"enabled",1) || !bound(d,integer(c,"id",0)) || integer(c,"version",0)!=integer(t,"version",0)) {
-                cJSON_DeleteItemFromArray(targets,i); if (!atomic_json(p,job,1)) break; continue;
+                cJSON_DeleteItemFromArray(targets,i); if (!checkpoint_pending(r,p,job)) break; continue;
             }
             if (integer(t,"next_try",0)>(int)time(NULL)) continue;
-            char error[256]="",body[8192]; J *m=cJSON_GetObjectItemCaseSensitive(job,"message"),*config=cJSON_GetObjectItemCaseSensitive(c,"config");
-            snprintf(body,sizeof(body),"%s%s[%s] %s\n%s\n%s",str(config,"prefix"),*str(config,"prefix")?"\n":"",str(job,"device_name"),str(m,"number"),str(m,"text"),str(m,"timestamp"));
+            char error[256]=""; J *m=cJSON_GetObjectItemCaseSensitive(job,"message"),*config=cJSON_GetObjectItemCaseSensitive(c,"config");
+            const char *format="%s%s[%s] %s\n%s\n%s";
+            int length=snprintf(NULL,0,format,str(config,"prefix"),*str(config,"prefix")?"\n":"",str(job,"device_name"),str(m,"number"),str(m,"text"),str(m,"timestamp"));
+            char *body=length>=0?malloc((size_t)length+1):NULL;
+            if (!body) { text(state,"error","Cannot allocate forward message"); break; }
+            snprintf(body,(size_t)length+1,format,str(config,"prefix"),*str(config,"prefix")?"\n":"",str(job,"device_name"),str(m,"number"),str(m,"text"),str(m,"timestamp"));
             int result=0,retry=0;
+            CommitContext ctx={.relay=r,.device=d,.path=p,.channel_id=integer(t,"id",0),.channel_version=integer(t,"version",0)};
             if (!strcmp(str(c,"kind"),"sms")) {
                 J *sim=adapter_sim(d,relay_monotonic()+30,error,sizeof(error));
                 if (sim && !strcmp(str(sim,"iccid"),str(job,"iccid")) && strcmp(str(m,"number"),str(config,"number"))) {
                     J *send=cJSON_Duplicate(sim,1); text(send,"number",str(config,"number")); text(send,"text",body); text(send,"key",str(job,"key"));
-                    J *sent=adapter_send(d,send,commit,NULL,&result,error,sizeof(error)); cJSON_Delete(sent); cJSON_Delete(send);
+                    J *sent=adapter_send(d,send,commit,&ctx,&result,error,sizeof(error)); cJSON_Delete(sent); cJSON_Delete(send);
                 } else snprintf(error,sizeof(error),"SIM changed, unavailable, or forwarding loop");
                 cJSON_Delete(sim);
-            } else {
-                J *secrets=channel_secrets(r,c);
+            } else if (commit(&ctx)) {
+                J *secrets=channel_secrets(&fresh,c);
                 if (secrets) result=push_deliver(str(c,"kind"),config,secrets,body,&retry,error,sizeof(error));
                 else snprintf(error,sizeof(error),"Cannot decrypt channel credentials");
                 delete_secret_json(secrets);
-            }
+            } else { wipe_secret(body); break; }
+            processed++; wipe_secret(body);
             J *event=cJSON_CreateObject(); number(event,"device_id",id); text(event,"channel",str(c,"name")); text(event,"status",result==3?"sent":"queued");
             number(event,"attempts",integer(t,"attempts",0)+1); text(event,"error",error); history(state,"push_history",event); cJSON_Delete(event);
             if (result==3) cJSON_DeleteItemFromArray(targets,i);
             else { number(t,"attempts",integer(t,"attempts",0)+1); number(t,"next_try",(int)time(NULL)+(retry>60 && retry<=3600?retry:60)); text(t,"error",error); }
-            /* One checkpoint per channel; successful targets are never kept intentionally. */
-            if (!atomic_json(p,job,1)) { text(state,"error","Cannot update pending file"); break; }
+            if (!checkpoint_pending(r,p,job)) { text(state,"error","Cannot update pending file"); break; }
         }
-        if (!cJSON_GetArraySize(targets)) unlink(p);
-        cJSON_Delete(job);
+        close_store(&fresh); cJSON_Delete(job);
     }
     closedir(dir);
 }
@@ -220,14 +386,25 @@ static int snapshot_update(Relay *r,J *state,J *d,J *sd,J *snapshot) {
     J *epoch=initialized?cJSON_GetObjectItemCaseSensitive(cursor,"time"):NULL;
     double previous=cJSON_IsNumber(epoch)?epoch->valuedouble:-1,latest=previous;
     J *keys=initialized?cJSON_Duplicate(array(cursor,"keys"),1):cJSON_CreateArray(); J *c,*m;
-    cJSON_ArrayForEach(c,array(r->config,"channels")) if (integer(c,"enabled",1) && bound(d,integer(c,"id",0))) {
-        J *b=cJSON_CreateObject(); number(b,"id",integer(c,"id",0)); number(b,"version",integer(c,"version",0)); cJSON_AddItemToArray(bindings,b);
-    }
+    /* Do not advance the durable cursor if this snapshot cannot fit in runtime state. */
     cJSON_ArrayForEach(m,fresh) {
         J *previous_message=NULL,*v; cJSON_ArrayForEach(v,old) if (!strcmp(str(v,"external_id"),str(m,"external_id"))) { previous_message=v; break; }
         int mid=previous_message?integer(previous_message,"id",0):integer(state,"next_message",1);
         if (!previous_message) number(state,"next_message",mid+1);
         number(m,"id",mid);
+    }
+    J *copy=cJSON_Duplicate(fresh,1),*prior=cJSON_DetachItemFromObjectCaseSensitive(sd,"messages");
+    if (copy) cJSON_AddItemToObject(sd,"messages",copy);
+    char *encoded=copy?cJSON_PrintUnformatted(state):NULL;
+    int fits=encoded && strlen(encoded)<=MAX_FILE-16384;
+    if (encoded) { erase_memory(encoded,strlen(encoded)); free(encoded); }
+    cJSON_DeleteItemFromObjectCaseSensitive(sd,"messages");
+    if (prior) cJSON_AddItemToObject(sd,"messages",prior);
+    if (!fits) { cJSON_Delete(keys); cJSON_Delete(cursor); cJSON_Delete(bindings); text(sd,"last_error","Runtime snapshot too large; progress not advanced"); return 0; }
+    cJSON_ArrayForEach(c,array(r->config,"channels")) if (integer(c,"enabled",1) && bound(d,integer(c,"id",0))) {
+        J *b=cJSON_CreateObject(); number(b,"id",integer(c,"id",0)); number(b,"version",integer(c,"version",0)); cJSON_AddItemToArray(bindings,b);
+    }
+    cJSON_ArrayForEach(m,fresh) {
         if (strcmp(str(m,"direction"),"inbound")) continue;
         double received=message_time(str(m,"timestamp"));
         int newer=received>previous || (received==previous && !key_in(cJSON_GetObjectItemCaseSensitive(cursor,"keys"),str(m,"external_id")));
@@ -250,6 +427,44 @@ static int snapshot_update(Relay *r,J *state,J *d,J *sd,J *snapshot) {
     char timestamp[40]; time_t now=time(NULL); struct tm tm; gmtime_r(&now,&tm); strftime(timestamp,sizeof(timestamp),"%Y-%m-%dT%H:%M:%SZ",&tm);
     text(sd,"last_sync",timestamp); text(sd,"last_error",""); return 1;
 }
+/* Retention runs after forwarding targets are persisted, so deleting the
+   device copy cannot lose a message that still has a pending forward. */
+static J *oldest_message(J *list) {
+    J *m,*oldest=NULL; double best=0;
+    cJSON_ArrayForEach(m,list) {
+        double stamp=message_time(str(m,"timestamp"));
+        if (stamp<0) continue;
+        if (!oldest || stamp<best || (stamp==best && strcmp(str(m,"external_id"),str(oldest,"external_id"))<0)) {
+            oldest=m; best=stamp;
+        }
+    }
+    return oldest;
+}
+static void remove_message_key(J *list,const char *key) {
+    for (int i=cJSON_GetArraySize(list)-1;i>=0;i--)
+        if (!strcmp(str(cJSON_GetArrayItem(list,i),"external_id"),key)) cJSON_DeleteItemFromArray(list,i);
+}
+static void prune_device_messages(Relay *r,J *device,J *sim,J *snapshot,J *sd) {
+    int keep=integer(device,"keep_messages",0), removed=0;
+    if (keep<=0) return;
+    J *messages=cJSON_GetObjectItemCaseSensitive(snapshot,"messages");
+    if (!cJSON_IsArray(messages) || cJSON_GetArraySize(messages)<=keep) return;
+    int excess=cJSON_GetArraySize(messages)-keep;
+    while (removed<excess && removed<PRUNE_BATCH) {
+        J *oldest=oldest_message(messages);
+        if (!oldest) break;
+        char key[69],error[256]="";
+        snprintf(key,sizeof(key),"%s",str(oldest,"external_id"));
+        J *op=cJSON_Duplicate(sim,1); text(op,"kind","delete"); text(op,"target",key);
+        CommitContext ctx={.relay=r,.device=device,.retention=1};
+        int outcome=adapter_operation(device,op,NULL,commit,&ctx,error,sizeof(error));
+        cJSON_Delete(op);
+        if (outcome!=3) { if (*error) text(sd,"last_error",error); break; }
+        remove_message_key(messages,key);
+        remove_message_key(cJSON_GetObjectItemCaseSensitive(sd,"messages"),key);
+        removed++;
+    }
+}
 static int action_path(Relay *r,const char *key,char out[4096]) { char hash[69],name[80],dir[4096]; if (!message_identity(key,hash)) return 0; snprintf(name,sizeof(name),"%s.json",hash); return path_join(dir,r->runtime,"actions") && path_join(out,dir,name); }
 static int same_request(J *old,J *args,const char *kind) {
     if (!strcmp(kind,"send")) return !strcmp(str(old,"number"),str(args,"number")) && !strcmp(str(old,"text"),str(args,"text"));
@@ -264,7 +479,8 @@ static J *enqueue_action(Relay *r,J *a,const char *kind) {
         if (!same_request(existing,a,kind)) { cJSON_Delete(existing); return failure("Request key already used with different SMS content"); }
         cJSON_DeleteItemFromObjectCaseSensitive(existing,"ciphertext"); return existing;
     }
-    J *s=runtime(r),*h; const char *list=!strcmp(kind,"send")?"send_history":"operation_history";
+    J *s=runtime(r),*h; if (!s) return failure(r->error);
+    const char *list=!strcmp(kind,"send")?"send_history":"operation_history";
     cJSON_ArrayForEach(h,cJSON_GetObjectItemCaseSensitive(s,list)) if (!strcmp(str(h,"request"),scoped)) { J *out=same_request(h,a,kind)?cJSON_Duplicate(h,1):failure("Request key already used with different SMS content"); cJSON_Delete(s); return out; }
     J *job=cJSON_Duplicate(a,1); text(job,"kind",kind); text(job,"request",scoped); text(job,"status","queued"); number(job,"id",(int)(time(NULL)%1000000000));
     if (!strcmp(kind,"pin")) {
@@ -273,7 +489,10 @@ static J *enqueue_action(Relay *r,J *a,const char *kind) {
         J *saved=pin_for(r,str(a,"iccid")); char context[40]; snprintf(context,sizeof(context),"pin-%s",str(a,"iccid"));
         char *pin=*str(a,"pin")?strdup(str(a,"pin")):open_secret(r,context,str(saved,"ciphertext"));
         if (!pin || strlen(pin)<4 || strlen(pin)>8 || strspn(pin,"0123456789")!=strlen(pin)) { wipe_secret(pin); cJSON_Delete(s); delete_secret_json(job); return failure("A saved or valid PIN is required"); }
-        char *encrypted=seal_secret(r,context,pin); wipe_secret(pin); cJSON_DeleteItemFromObjectCaseSensitive(job,"pin");
+        char *encrypted=seal_secret(r,context,pin); wipe_secret(pin);
+        J *plain=cJSON_GetObjectItemCaseSensitive(job,"pin");
+        if (cJSON_IsString(plain)) erase_memory(plain->valuestring,strlen(plain->valuestring));
+        cJSON_DeleteItemFromObjectCaseSensitive(job,"pin");
         if (!encrypted) { cJSON_Delete(s); cJSON_Delete(job); return NULL; }
         text(job,"ciphertext",encrypted); free(encrypted);
     }
@@ -283,33 +502,45 @@ static J *enqueue_action(Relay *r,J *a,const char *kind) {
 }
 static void process_actions(Relay *r,J *state) {
     char dirpath[4096],p[4096]; path_join(dirpath,r->runtime,"actions"); DIR *dir=opendir(dirpath); if (!dir) return;
-    struct dirent *e;
+    struct dirent *e; int processed=0;
     while ((e=readdir(dir))) if (json_name(e->d_name)) {
         path_join(p,dirpath,e->d_name); J *job=read_json(p); if (!job) continue;
         int id=integer(job,"device_id",0); J *d=find(array(r->config,"devices"),id); char error[256]=""; int outcome=0;
         int send=!strcmp(str(job,"kind"),"send");
-        if (d && integer(d,"enabled",1)) {
+        CommitContext ctx={.relay=r,.device=d,.job=job,.path=p};
+        if (!strcmp(str(job,"status"),"attempting")) {
+            outcome=1; snprintf(error,sizeof(error),"Operation interrupted after submission; do not retry automatically");
+        } else if (d && integer(d,"enabled",1)) {
             J *sim=adapter_sim(d,relay_monotonic()+30,error,sizeof(error));
             if (sim) {
                 text(job,"hardware_id",str(sim,"hardware_id"));
                 if (send) {
-                    text(job,"iccid",str(sim,"iccid")); J *result=adapter_send(d,job,commit,NULL,&outcome,error,sizeof(error)); cJSON_Delete(result);
+                    text(job,"iccid",str(sim,"iccid")); J *result=adapter_send(d,job,commit,&ctx,&outcome,error,sizeof(error)); cJSON_Delete(result);
                 } else if (!strcmp(str(job,"kind"),"pin")) {
                     char context[40]; snprintf(context,sizeof(context),"pin-%s",str(job,"iccid")); char *pin=open_secret(r,context,str(job,"ciphertext"));
-                    if (pin) outcome=adapter_operation(d,job,pin,commit,NULL,error,sizeof(error));
+                    if (pin) outcome=adapter_operation(d,job,pin,commit,&ctx,error,sizeof(error));
                     wipe_secret(pin);
                 } else {
                     J *targets=cJSON_GetObjectItemCaseSensitive(job,"targets"),*target; outcome=3;
                     cJSON_ArrayForEach(target,targets) {
                         J *op=cJSON_Duplicate(sim,1); text(op,"kind","delete"); text(op,"target",target->valuestring);
-                        int result=adapter_operation(d,op,NULL,commit,NULL,error,sizeof(error)); cJSON_Delete(op); if (result!=3) { outcome=result; break; }
+                        int result=adapter_operation(d,op,NULL,commit,&ctx,error,sizeof(error)); cJSON_Delete(op); if (result!=3) { outcome=result; break; }
                     }
                 }
             }
             cJSON_Delete(sim);
         } else snprintf(error,sizeof(error),"Device missing or disabled");
         cJSON_DeleteItemFromObjectCaseSensitive(job,"ciphertext"); text(job,"status",outcome==3?(send?"sent":"succeeded"):outcome==1?"unconfirmed":"failed"); text(job,"error",error);
-        history(state,send?"send_history":"operation_history",job); unlink(p); cJSON_Delete(job);
+        const char *history_key=send?"send_history":"operation_history";
+        history(state,history_key,job);
+        char state_path[4096]; path_join(state_path,r->runtime,"state.json");
+        if (atomic_json(state_path,state,0)) unlink(p);
+        else {
+            J *entries=array(state,history_key); cJSON_DeleteItemFromArray(entries,cJSON_GetArraySize(entries)-1);
+            text(state,"error","Cannot save operation result; task retained");
+        }
+        cJSON_Delete(job);
+        if (++processed>=ACTIONS_PER_TICK) break;
     }
     closedir(dir);
 }
@@ -318,7 +549,9 @@ void poll_devices(Relay *r) {
     if (r->lock>=0) { close(r->lock); r->lock=-1; }
     char p[4096]; path_join(p,r->runtime,"worker.lock"); int fd=open(p,O_CREAT|O_RDWR|O_CLOEXEC|O_NOFOLLOW,0600);
     if (fd<0 || flock(fd,LOCK_EX|LOCK_NB)<0) { if (fd>=0) close(fd); return; }
-    J *state=runtime(r),*d; text(state,"error","");
+    J *state=runtime(r),*d;
+    if (!state) { fprintf(stderr,"%s\n",r->error); close(fd); return; }
+    text(state,"error","");
     process_actions(r,state);
     cJSON_ArrayForEach(d,array(r->config,"devices")) if (integer(d,"enabled",1)) {
         int id=integer(d,"id",0); J *sd=state_device(state,id);
@@ -328,15 +561,26 @@ void poll_devices(Relay *r) {
         char error[256]=""; J *sim=adapter_sim(d,relay_monotonic()+30,error,sizeof(error));
         if (sim) {
             item(sd,"sim",cJSON_Duplicate(sim,1)); J *pin=pin_for(r,str(sim,"iccid"));
-            if (!strcmp(str(sim,"unlock_required"),"none")) number(sd,"auto_attempted",0);
-            if (pin && integer(pin,"auto_enabled",0) && !integer(sd,"auto_attempted",0) && !strcmp(str(sim,"unlock_required"),"sim-pin") && integer(sim,"pin_retries",-1)==3) {
-                number(sd,"auto_attempted",1); char context[40]; snprintf(context,sizeof(context),"pin-%s",str(sim,"iccid"));
+            if (pin && integer(pin,"auto_attempted",0) && !strcmp(str(sim,"unlock_required"),"none")) clear_auto_attempt(r,d,pin);
+            if (pin && integer(pin,"auto_enabled",0) && !integer(pin,"auto_attempted",0) && !strcmp(str(sim,"unlock_required"),"sim-pin") && integer(sim,"pin_retries",-1)==3) {
+                char context[40]; snprintf(context,sizeof(context),"pin-%s",str(sim,"iccid"));
                 char *secret=open_secret(r,context,str(pin,"ciphertext")); J *op=cJSON_Duplicate(sim,1); text(op,"kind","pin");
-                int outcome=secret?adapter_operation(d,op,secret,commit,NULL,error,sizeof(error)):0;
+                CommitContext ctx={.relay=r,.device=d,.pin=pin};
+                int outcome=secret?adapter_operation(d,op,secret,commit,&ctx,error,sizeof(error)):0;
                 number(op,"device_id",id); text(op,"status",outcome==3?"succeeded":outcome==1?"unconfirmed":"failed"); text(op,"error",error);
                 history(state,"operation_history",op); wipe_secret(secret); cJSON_Delete(op);
             }
-            J *snapshot=adapter_read(d,error,sizeof(error)); if (snapshot) { snapshot_update(r,state,d,sd,snapshot); cJSON_Delete(snapshot); } else text(sd,"last_error",*error?error:"Cannot read device SMS");
+            J *snapshot=adapter_read(d,error,sizeof(error));
+            if (snapshot) {
+                Relay current={.lock=-1}; int updated=0;
+                if (open_store(&current,r->path)) {
+                    J *latest=find(array(current.config,"devices"),id);
+                    if (same_device(d,latest)) updated=snapshot_update(&current,state,latest,sd,snapshot);
+                }
+                close_store(&current);
+                if (updated) prune_device_messages(r,d,sim,snapshot,sd);
+                cJSON_Delete(snapshot);
+            } else text(sd,"last_error",*error?error:"Cannot read device SMS");
             cJSON_Delete(sim);
         } else text(sd,"last_error",*error?error:"Cannot read SIM state");
         number(sd,"next_poll",(int)time(NULL)+integer(d,"poll_interval",30));
@@ -351,10 +595,44 @@ static J *list_history(J *state,const char *key,int id) { J *out=cJSON_CreateArr
 J *dispatch(Relay *r,const char *method,J *a) {
     J *devices=array(r->config,"devices"),*channels=array(r->config,"channels"); int id=integer(a,"device_id",0); J *d=find(devices,id);
     if (!strcmp(method,"status")) { J *out=ok(); text(out,"version","0.6.0"); text(out,"storage","uci+pending-files"); cJSON_AddBoolToObject(out,"smtp_available",access("/usr/bin/msmtp",X_OK)==0); return out; }
+    if (!strcmp(method,"api_settings")) {
+        J *api=cJSON_GetObjectItemCaseSensitive(r->config,"api"),*out=cJSON_CreateObject();
+        number(out,"enabled",integer(api,"enabled",0)); number(out,"port",integer(api,"port",8848));
+        text(out,"scope",*str(api,"scope")?str(api,"scope"):"lan");
+        text(out,"transport",*str(api,"transport")?str(api,"transport"):"https");
+        cJSON_AddBoolToObject(out,"has_token",*str(api,"token_hash")!=0); return out;
+    }
+    if (!strcmp(method,"save_api_settings")) {
+        int enabled=integer(a,"enabled",0),port=integer(a,"port",8848); const char *scope=str(a,"scope"),*token=str(a,"token"),*transport=str(a,"transport");
+        if (!*transport) transport="https";
+        if ((enabled!=0 && enabled!=1) || port<1 || port>65535 || (strcmp(scope,"lan") && strcmp(scope,"any")) ||
+            (strcmp(transport,"http") && strcmp(transport,"https")) ||
+            (*token && (strlen(token)!=64 || strspn(token,"0123456789abcdef")!=64))) return failure("Invalid API settings");
+        J *api=cJSON_GetObjectItemCaseSensitive(r->config,"api");
+        if (!cJSON_IsObject(api)) { api=cJSON_CreateObject(); if (!api) return NULL; item(r->config,"api",api); }
+        if (*token) {
+            unsigned char hash[crypto_hash_sha256_BYTES]; char hex[crypto_hash_sha256_BYTES*2+1];
+            if (sodium_init()<0 || crypto_hash_sha256(hash,(const unsigned char *)token,strlen(token))) return NULL;
+            sodium_bin2hex(hex,sizeof(hex),hash,sizeof(hash)); sodium_memzero(hash,sizeof(hash)); text(api,"token_hash",hex);
+        }
+        if (enabled && !*str(api,"token_hash")) return failure("Generate an API token before enabling the service");
+        int revision=integer(api,"revision",0); if (revision<0 || revision>=2147483646) revision=0;
+        number(api,"revision",revision+1); number(api,"enabled",enabled); number(api,"port",port); text(api,"scope",scope); text(api,"transport",transport);
+        if (!save_config(r)) return failure("Cannot commit UCI configuration");
+#ifndef RELAY_TESTING
+        pid_t child=fork();
+        if (!child) {
+            setsid(); int fd=open("/dev/null",O_RDWR);
+            if (fd>=0) { dup2(fd,STDIN_FILENO); dup2(fd,STDOUT_FILENO); dup2(fd,STDERR_FILENO); if (fd>2) close(fd); }
+            execl("/etc/init.d/sim-relay-api","sim-relay-api","restart",(char *)NULL); _exit(127);
+        }
+#endif
+        return ok();
+    }
     if (!strcmp(method,"discover")) { char error[256]=""; J *out=mm_discover(error,sizeof(error)); return out?out:failure(error); }
     if (!strcmp(method,"save_device")) {
-        int did=integer(a,"id",0),interval=integer(a,"poll_interval",30); const char *adapter=str(a,"adapter"); J *old=find(devices,did);
-        if (!*str(a,"name") || strlen(str(a,"name"))>128 || interval<10 || interval>86400 || (strcmp(adapter,"mock") && strcmp(adapter,"zte_mf833u1") && strcmp(adapter,"modemmanager")) || (!strcmp(adapter,"zte_mf833u1") && !valid_url(str(a,"base_url"))) || (did && !old)) return failure("Invalid device configuration");
+        int did=integer(a,"id",0),interval=integer(a,"poll_interval",30),keep=integer(a,"keep_messages",0); const char *adapter=str(a,"adapter"); J *old=find(devices,did);
+        if (!*str(a,"name") || strlen(str(a,"name"))>128 || interval<10 || interval>86400 || keep<0 || keep>1000 || (strcmp(adapter,"mock") && strcmp(adapter,"zte_mf833u1") && strcmp(adapter,"modemmanager")) || (!strcmp(adapter,"zte_mf833u1") && !valid_url(str(a,"base_url"))) || (did && !old)) return failure("Invalid device configuration");
         if (old && (strcmp(str(old,"adapter"),adapter) || strcmp(str(old,"base_url"),str(a,"base_url")))) return failure("Remove and re-add a device to change its adapter/address");
         if (!old && !strcmp(adapter,"zte_mf833u1")) {
             J *existing;
@@ -381,7 +659,8 @@ J *dispatch(Relay *r,const char *method,J *a) {
         remove_id(devices,did); cJSON_AddItemToArray(devices,n); return save_result(r,did);
     }
     if (!strcmp(method,"devices")) {
-        J *out=cJSON_Duplicate(devices,1),*s=runtime(r),*v; cJSON_ArrayForEach(v,out) {
+        J *s=runtime(r); if (!s) return failure(r->error);
+        J *out=cJSON_Duplicate(devices,1),*v; cJSON_ArrayForEach(v,out) {
             J *sd=find(cJSON_GetObjectItemCaseSensitive(s,"devices"),integer(v,"id",0));
             const char *keys[]={"last_error","last_sync","iccid"}; for (size_t i=0;i<3;i++) text(v,keys[i],str(sd,keys[i]));
             if (*str(sd,"hardware_id")) text(v,"hardware_id",str(sd,"hardware_id"));
@@ -392,7 +671,8 @@ J *dispatch(Relay *r,const char *method,J *a) {
         if (!d) return failure("Device not found");
         char p[4096],name[40],iccid[23]="";
         snprintf(name,sizeof(name),"cursor-%d.json",id); path_join(p,r->path,name);
-        J *state=runtime(r),*sd=find(cJSON_GetObjectItemCaseSensitive(state,"devices"),id);
+        J *state=runtime(r); if (!state) return failure(r->error);
+        J *sd=find(cJSON_GetObjectItemCaseSensitive(state,"devices"),id);
         const char *current=str(cJSON_GetObjectItemCaseSensitive(sd,"sim"),"iccid");
         if (!*current) current=str(sd,"iccid");
         J *cursor=read_json(p);
@@ -401,7 +681,8 @@ J *dispatch(Relay *r,const char *method,J *a) {
         J *pins=array(r->config,"pins");
         for (int i=cJSON_GetArraySize(pins)-1;i>=0;i--) {
             J *pin=cJSON_GetArrayItem(pins,i);
-            if (integer(pin,"device_id",0)==id || (*iccid && !strcmp(str(pin,"iccid"),iccid))) cJSON_DeleteItemFromArray(pins,i);
+            int owner=integer(pin,"device_id",0);
+            if (owner==id || (owner<=0 && *iccid && !strcmp(str(pin,"iccid"),iccid))) cJSON_DeleteItemFromArray(pins,i);
         }
         cJSON_Delete(cursor); cJSON_Delete(state);
         remove_id(devices,id); J *result=save_result(r,id);
@@ -446,7 +727,8 @@ J *dispatch(Relay *r,const char *method,J *a) {
         item(d,"channels",ids); return save_result(r,id);
     }
     if (!strcmp(method,"device_channels")) { J *out=cJSON_CreateArray(),*v; cJSON_ArrayForEach(v,array(d,"channels")) { J *b=cJSON_CreateObject(); number(b,"channel_id",v->valueint); cJSON_AddItemToArray(out,b); } return out; }
-    J *s=runtime(r),*sd=state_device(s,id),*out=NULL;
+    J *s=runtime(r); if (!s) return failure(r->error);
+    J *sd=state_device(s,id),*out=NULL;
     if (!strcmp(method,"sim_info")) {
         J *sim=cJSON_GetObjectItemCaseSensitive(sd,"sim"); out=cJSON_CreateObject(); item(out,"sim",sim?cJSON_Duplicate(sim,1):cJSON_CreateObject()); text(out,"iccid",str(sim,"iccid")); J *pin=pin_for(r,str(sim,"iccid"));
         cJSON_AddBoolToObject(out,"saved",pin && *str(pin,"ciphertext")); number(out,"auto_enabled",integer(pin,"auto_enabled",0));

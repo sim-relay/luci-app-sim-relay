@@ -109,6 +109,15 @@ def inspect_elf(data):
     return dict(bits=bits, machine=machine, interpreter=interpreter, needed=libs, bytes=len(data))
 
 
+def verify_smtp_dependencies(fields):
+    version = re.match(r'^(\d+)\.(\d+)\.(\d+)-r(\d+)(?:$|[^0-9])', fields.get('Version', ''))
+    if version and tuple(map(int, version.groups())) >= (0, 6, 0, 8):
+        dependencies = {part.strip().split(' ', 1)[0] for part in fields.get('Depends', '').split(',')}
+        missing = {'msmtp', 'ca-bundle'} - dependencies
+        if missing:
+            raise ValueError('Missing SMTP dependencies: ' + ', '.join(sorted(missing)))
+
+
 def verify(directory, machine=None, require_zh_cn=False):
     packages = {}
     for path in sorted(directory.glob('*.ipk')):
@@ -123,6 +132,7 @@ def verify(directory, machine=None, require_zh_cn=False):
         if name not in packages:
             raise ValueError(f'Missing compiled package: {name}')
     _, core, data = packages['sim-relay']
+    verify_smtp_dependencies(core)
     required = ['usr/sbin/sim-relayd', 'etc/config/sim-relay', 'etc/init.d/sim-relay', 'usr/libexec/rpcd/sim-relay']
     for name in required:
         if name not in data:
@@ -130,6 +140,11 @@ def verify(directory, machine=None, require_zh_cn=False):
     for name in (required[0], required[2], required[3]):
         if not data[name][1] & 0o111:
             raise ValueError(f'Installed file is not executable: {name}')
+    match = re.match(r'0\.6\.0-r(\d+)', core.get('Version', ''))
+    if match and int(match.group(1)) >= 10:
+        for name in ('etc/init.d/sim-relay-api', 'usr/libexec/sim-relay-api'):
+            if name not in data or not data[name][1] & 0o111:
+                raise ValueError(f'Missing executable API component: {name}')
     binary = data[required[0]][0]
     elf = inspect_elf(binary)
     if machine is not None and elf['machine'] != machine:
@@ -180,6 +195,10 @@ def verify(directory, machine=None, require_zh_cn=False):
             if 'www/luci-static/resources/view/sim-relay/' + name not in data:
                 raise ValueError(f'Missing management view: {name}')
     english_menu = json.loads(data[menu][0])
+    if match and int(match.group(1)) >= 10:
+        api_view = english_menu.get('admin/services/sim-relay/api', {}).get('action', {}).get('path', '')
+        if not api_view or 'www/luci-static/resources/view/' + api_view + '.js' not in data:
+            raise ValueError('Missing API configuration view')
     if version is not None and tuple(map(int, version.groups())) >= (0, 6):
         for node in english_menu.values():
             if node.get('action', {}).get('type') == 'view' and 'luci-app-sim-relay' not in node.get('depends', {}).get('acl', []):

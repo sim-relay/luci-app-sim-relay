@@ -36,9 +36,13 @@ char *device_request(const char *base, const char *path, const char *params,
     if (!c) return NULL;
     Buffer b={0};
     struct curl_slist *headers=NULL;
-    headers=curl_slist_append(headers,"X-Requested-With: XMLHttpRequest");
-    headers=curl_slist_append(headers,"Cache-Control: no-cache");
-    if (write) headers=curl_slist_append(headers,"Content-Type: application/x-www-form-urlencoded; charset=UTF-8");
+    const char *values[]={"X-Requested-With: XMLHttpRequest", "Cache-Control: no-cache",
+        "Content-Type: application/x-www-form-urlencoded; charset=UTF-8"};
+    for (size_t i=0;i<(write?3U:2U);i++) {
+        struct curl_slist *next=curl_slist_append(headers,values[i]);
+        if (!next) { curl_slist_free_all(headers); curl_easy_cleanup(c); snprintf(error,size,"Cannot allocate request headers"); return NULL; }
+        headers=next;
+    }
     curl_easy_setopt(c,CURLOPT_URL,url);
     curl_easy_setopt(c,CURLOPT_REFERER,referer);
     curl_easy_setopt(c,CURLOPT_HTTPHEADER,headers);

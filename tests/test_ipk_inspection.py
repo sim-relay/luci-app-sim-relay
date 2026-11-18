@@ -24,6 +24,14 @@ def archive(files):
 
 
 class ArtifactTests(unittest.TestCase):
+    def test_smtp_dependencies_required_from_release_eight(self):
+        ipk.verify_smtp_dependencies({'Version': '0.6.0-r7', 'Depends': 'libc'})
+        ipk.verify_smtp_dependencies({'Version': '0.6.0-r8', 'Depends': 'libc, msmtp, ca-bundle'})
+        with self.assertRaisesRegex(ValueError, 'ca-bundle'):
+            ipk.verify_smtp_dependencies({'Version': '0.6.0-r8', 'Depends': 'msmtp'})
+        with self.assertRaisesRegex(ValueError, 'msmtp'):
+            ipk.verify_smtp_dependencies({'Version': '0.7.0-r1', 'Depends': 'ca-bundle'})
+
     def test_both_packages_are_visible_to_openwrt_scanner(self):
         root = Path(__file__).resolve().parents[1]
         # include/scan.mk greps the package Makefile itself, not included luci.mk.

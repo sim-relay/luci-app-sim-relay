@@ -10,6 +10,8 @@ J *failure(const char *);
 int open_store(Relay *,const char *);
 void close_store(Relay *);
 J *dispatch(Relay *,const char *,J *);
+int api_serve(Relay *);
+int api_reserve_send(Relay *);
 void poll_devices(Relay *);
 void reset_runtime(Relay *);
 double relay_monotonic(void);

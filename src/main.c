@@ -47,8 +47,9 @@ static const char *methods=
     "\"operation_history\":{\"device_id\":0},"
     "\"remove_device\":{\"device_id\":0},"
     "\"send\":{\"device_id\":0,\"key\":\"\",\"number\":\"\",\"text\":\"\"},"
+    "\"api_settings\":{},\"save_api_settings\":{\"enabled\":0,\"scope\":\"\",\"port\":0,\"transport\":\"\",\"token\":\"\"},"
     "\"send_history\":{\"device_id\":0},"
-    "\"save_device\":{\"id\":0,\"name\":\"\",\"adapter\":\"\",\"base_url\":\"\",\"modem\":\"\",\"poll_interval\":0,\"enabled\":0},"
+    "\"save_device\":{\"id\":0,\"name\":\"\",\"adapter\":\"\",\"base_url\":\"\",\"modem\":\"\",\"poll_interval\":0,\"enabled\":0,\"keep_messages\":0},"
     "\"messages\":{\"device_id\":0,\"limit\":0,\"offset\":0,\"after_id\":0,\"query\":\"\",\"direction\":\"\"},"
     "\"sync\":{\"device_id\":0}}";
 int main(int argc, char **argv) {
@@ -58,11 +59,15 @@ int main(int argc, char **argv) {
     if (argc>3 && !strcmp(argv[1],"--state-dir")) { path=argv[2]; i=3; }
     if (i>=argc) { fprintf(stderr,"Usage: sim-relayd [--state-dir PATH] list | call METHOD | daemon | poll\n"); return 2; }
     if (!strcmp(argv[i],"list")) { puts(methods); return 0; }
-    int daemon=!strcmp(argv[i],"daemon"), once=!strcmp(argv[i],"poll");
-    if (!daemon && !once && (strcmp(argv[i],"call") || i+1>=argc)) return 2;
+    int daemon=!strcmp(argv[i],"daemon"), once=!strcmp(argv[i],"poll"), api=!strcmp(argv[i],"api");
+    if (!daemon && !once && !api && (strcmp(argv[i],"call") || i+1>=argc)) return 2;
     if (curl_global_init(CURL_GLOBAL_DEFAULT)!=CURLE_OK) return 1;
     Relay r={.lock=-1}; J *out=NULL; int exit_code=0;
-    if (!open_store(&r,path)) { out=failure(r.error); exit_code=1; }
+    if (!open_store(&r,path)) {
+        if (api) { fputs("Status: 503 Service Unavailable\r\nContent-Type: application/json\r\nCache-Control: no-store\r\n\r\n{\"error\":\"Service unavailable\"}\n",stdout); }
+        else out=failure(r.error);
+        exit_code=1;
+    }
     else if (daemon) {
         signal(SIGTERM,stop); signal(SIGINT,stop);
         /* Clear volatile UI state; persistent cursors still recover newer SMS. */
@@ -74,6 +79,7 @@ int main(int argc, char **argv) {
             if (!open_store(&r,path)) { fprintf(stderr,"%s\n",r.error); exit_code=1; break; }
         }
     } else if (once) poll_devices(&r);
+    else if (api) exit_code=api_serve(&r);
     else {
         char input[16386]; size_t n=fread(input,1,sizeof(input)-1,stdin); input[n]=0;
         J *args=n ? cJSON_ParseWithLengthOpts(input,n+1,NULL,1) : cJSON_CreateObject();
